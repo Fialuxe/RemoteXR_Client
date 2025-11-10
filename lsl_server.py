@@ -57,7 +57,7 @@ FACEMESH_SAMPLE_RATE = 0.0
 FACEMESH_CHANNEL_FORMAT = 'float32'
 FACEMESH_SOURCE_ID = 'eyetrax_facemesh_001'
 # --- End LSL Configuration ---
-def create_facemesh_lsl_outlet():
+def create_facemesh_lsl_outlet(): 
     """
     Creates and returns a new LSL StreamOutlet for MediaPipe FaceMesh data.
     Sends 10 key landmark points (x, y, z) for avatar expression, normalized to [0,1] (x, y) and z in meters.
@@ -72,7 +72,11 @@ def create_facemesh_lsl_outlet():
     )
     chns = info.desc().append_child("channels")
     # Use 10 key points: 0(nose tip), 33(right eye), 263(left eye), 61(mouth right), 291(mouth left), 199(chin), 1(forehead), 13(upper lip), 14(lower lip), 17(right cheek)
-    landmark_names = ["nose_tip", "right_eye", "left_eye", "mouth_right", "mouth_left", "chin", "forehead", "upper_lip", "lower_lip", "right_cheek"]
+    landmark_names = ["nose_tip", "right_eye", 
+                      "left_eye", "mouth_right", 
+                      "mouth_left", "chin", 
+                      "forehead", "upper_lip", 
+                      "lower_lip", "right_cheek"]
     for name in landmark_names:
         for axis in ["x", "y", "z"]:
             ch = chns.append_child("channel")
@@ -189,8 +193,13 @@ def run_demo_with_lsl():
     mp_face_mesh = mp.solutions.face_mesh
     with camera(camera_index) as cap, mp_face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5) as face_mesh:
         prev_time = time.time()
+        last_print_time = time.time()
+        frame_count = 0
+        gaze_data_str = "N/A"
+        facemesh_data_str = "N/A"
 
         for frame in iter_frames(cap):
+            frame_count += 1
             features, blink_detected = gaze_estimator.extract_features(frame)
             lsl_sample = [np.nan, np.nan, np.nan] # Default to NaN
 
@@ -235,15 +244,33 @@ def run_demo_with_lsl():
             if outlet:
                 try:
                     outlet.push_sample(lsl_sample, local_clock())
-                    print(f"\rPushed LSL sample: {lsl_sample}", end="")
+                    if not np.isnan(lsl_sample[0]) and not np.isnan(lsl_sample[1]):
+                        gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f}"
+                    else:
+                        gaze_data_str = "Gaze: INVALID"
                 except Exception as e:
-                    print(f"Error pushing LSL sample: {e}")
+                    gaze_data_str = f"Gaze Error: {e}"
+            
             if facemesh_outlet:
                 try:
                     facemesh_outlet.push_sample(facemesh_sample, local_clock())
-                    print(f" | Pushed FaceMesh sample", end="")
+                    # Check if facemesh data is valid
+                    if not np.isnan(facemesh_sample[0]):
+                        # Count valid landmarks
+                        valid_count = sum(1 for i in range(0, 30, 3) if not np.isnan(facemesh_sample[i]))
+                        facemesh_data_str = f"FaceMesh: {valid_count}/10 landmarks"
+                    else:
+                        facemesh_data_str = "FaceMesh: INVALID"
                 except Exception as e:
-                    print(f"Error pushing FaceMesh sample: {e}")
+                    facemesh_data_str = f"FaceMesh Error: {e}"
+            
+            # Print data every second (overwrite previous line)
+            current_time = time.time()
+            if current_time - last_print_time >= 1.0:
+                fps = frame_count / (current_time - last_print_time)
+                print(f"\r[FPS: {fps:.1f}] {gaze_data_str} | {facemesh_data_str}          ", end="", flush=True)
+                last_print_time = current_time
+                frame_count = 0
 
             # --- Minimal debug UI ---
             canvas = np.ones((400, 320, 3), dtype=np.uint8) * 30  # dark background
@@ -287,9 +314,9 @@ def run_demo_with_lsl():
             # Show window
             cv2.imshow("Minimal Eye/Face Debug", canvas)
             if cv2.waitKey(1) == 27:
-                print("Escape key pressed. Stopping stream.")
+                print("\nEscape key pressed. Stopping stream.")
                 break
-        print("Demo loop finished.")
+        print("\nDemo loop finished.")
 
 
 if __name__ == "__main__":
