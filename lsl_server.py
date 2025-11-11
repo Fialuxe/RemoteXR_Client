@@ -64,8 +64,8 @@ except ImportError as e:
 STREAM_NAME = "EyeGaze"
 STREAM_TYPE = "Gaze"
 CHANNEL_COUNT = 3
-# Use 0.0 for irregular rate; timestamps will be managed by local_clock()
-SAMPLE_RATE = 0.0 
+# Use 30.0 for fixed rate; was 0.0 for irregular rate (causing crashes)
+SAMPLE_RATE = 30.0
 CHANNEL_FORMAT = 'float32'
 SOURCE_ID = 'eyetrax_source_001'
 
