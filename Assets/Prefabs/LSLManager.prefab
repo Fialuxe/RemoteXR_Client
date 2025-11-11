@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1552418032959293430
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5320419005657039507}
+  - component: {fileID: 6302654517782935371}
+  - component: {fileID: 8944714163597623145}
+  - component: {fileID: 7570508639197865786}
+  m_Layer: 0
+  m_Name: LSLManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5320419005657039507
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1552418032959293430}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.67128, y: 0, z: -0.78439}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6302654517782935371
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1552418032959293430}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47f3738ec5046b14b8ec0416db8e7343, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LslFaceMeshReceiver
+  streamName: FaceMesh
+  streamType: FaceLandmarks
+  channelCount: 30
+  resolveTimeout: 2
+  pullTimeout: 0
+  logEveryFrame: 0
+  logInterval: 1
+--- !u!114 &8944714163597623145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1552418032959293430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49ba4953098665c45a37ac24fa93e920, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LslGazeReceiver
+  streamName: EyeGaze
+  streamType: Gaze
+  channelCount: 3
+  resolveTimeout: 2
+  pullTimeout: 0
+  logEveryFrame: 1
+  logInterval: 0.5
+--- !u!114 &7570508639197865786
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1552418032959293430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e817ea7bffb8e2840b36738d1900b0c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  lineRenderer: {fileID: 0}

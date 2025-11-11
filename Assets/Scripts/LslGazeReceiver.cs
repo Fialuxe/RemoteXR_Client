@@ -68,7 +68,12 @@ public class LslGazeReceiver : MonoBehaviour
             _lastTimestamp = ts;
             if (logEveryFrame)
             {
-                Debug.Log($"LSL EyeGaze [t={ts:F3}] x={_sample[0]:F3} y={_sample[1]:F3} pupil={_sample[2]:F3}");
+                //Debug.Log($"LSL EyeGaze [t={ts:F3}] x={_sample[0]:F3} y={_sample[1]:F3} pupil={_sample[2]:F3}");
+                var gazeMapper = GetComponent<Map2DGazeToMesh>();
+                if (gazeMapper != null)
+                {
+                    gazeMapper.UpdateGazePosition2D(new Vector2(_sample[0], _sample[1]));
+                }
             }
         }
 
