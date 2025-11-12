@@ -26,7 +26,7 @@ public class LslFaceMeshReceiver : MonoBehaviour
     [Tooltip("If true, logs every received sample; otherwise logs at interval.")]
     public bool logEveryFrame = false;
     [Tooltip("Seconds between logs when logEveryFrame is false.")]
-    public float logInterval = 1.0f;
+    public float logInterval = 5.0f;
 
     private StreamInlet _inlet;
     private float[] _sample;
@@ -225,6 +225,18 @@ public class LslFaceMeshReceiver : MonoBehaviour
 
             if (results.Length > 0)
             {
+                // Get actual channel count from stream info
+                int actualChannelCount = results[0].channel_count();
+                
+                Debug.Log($"LSL FaceMesh stream found: {results[0].name()} with {actualChannelCount} channels (expected {channelCount})");
+                
+                // Update channel count if different
+                if (actualChannelCount != channelCount)
+                {
+                    Debug.LogWarning($"Channel count mismatch! Expected {channelCount}, got {actualChannelCount}. Updating to match stream.");
+                    channelCount = actualChannelCount;
+                }
+                
                 // CRITICAL FIX: Set max_buflen to 4 seconds (120 samples at 30 FPS).
                 // Python server now sends with nominal_srate=30.0 instead of IRREGULAR_RATE (0.0).
                 // This prevents buffer allocation issues in liblsl.dylib on Apple M1.
@@ -272,6 +284,11 @@ public class LslFaceMeshReceiver : MonoBehaviour
         if (_sample == null || index < 0 || index >= 68)
             return Vector3.zero;
         
+        // Check if sample array is large enough
+        int requiredSize = (index + 1) * 3;
+        if (_sample.Length < requiredSize)
+            return Vector3.zero;
+        
         float x = _sample[index * 3 + 0];
         float y = _sample[index * 3 + 1];
         float z = _sample[index * 3 + 2];
@@ -285,6 +302,11 @@ public class LslFaceMeshReceiver : MonoBehaviour
     public bool IsLandmarkValid(int index)
     {
         if (_sample == null || index < 0 || index >= 68)
+            return false;
+        
+        // Check if sample array is large enough
+        int requiredSize = (index + 1) * 3;
+        if (_sample.Length < requiredSize)
             return false;
         
         float x = _sample[index * 3 + 0];
