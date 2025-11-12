@@ -1,8 +1,28 @@
 # Usage:
 # python3 lsl_server.py --camera 1 --filter kalman
-# Data Format:
-# EyeGaze LSL Stream: [gaze_x_normalized, gaze_y_normalized, pupil_dummy]
-# FaceMesh LSL Stream: [10 key landmark points (x,y,z)]: nose_tip, right_eye, left_eye, mouth_right, mouth_left, chin, forehead, upper_lip, lower_lip, right_cheek
+#
+# Data Format Specification:
+# --------------------------------------------------------------------------------
+# EyeGaze LSL Stream: [gaze_x_normalized, gaze_y_normalized, blink]
+#   - gaze_x_normalized: Horizontal gaze position, normalized [0.0, 1.0]
+#                        0.0 = left edge of display, 1.0 = right edge of display
+#   - gaze_y_normalized: Vertical gaze position, normalized [0.0, 1.0]
+#                        0.0 = top edge of display, 1.0 = bottom edge of display
+#   - blink: Blink detection flag (0 or 1)
+#            0 = eyes open (normal gaze)
+#            1 = blink detected
+#
+# Transmission Rules:
+#   - If blink detected:        Send (0.0, 0.0, 1.0)
+#   - If eyes open and valid:   Send (x, y, 0.0) where x,y are normalized gaze coords
+#   - If data is invalid:       Do NOT send anything, skip to next frame
+#
+# FaceMesh LSL Stream: [10 key landmark points (x,y,z)]
+#   - Landmarks: nose_tip, right_eye, left_eye, mouth_right, mouth_left, 
+#                chin, forehead, upper_lip, lower_lip, right_cheek
+#   - x, y: normalized [0.0, 1.0]
+#   - z: depth in meters (relative to camera)
+# --------------------------------------------------------------------------------
 # This script runs the Eyetrax gaze estimation demo and streams gaze data and MediaPipe FaceMesh data via LSL.
 # --- Imports ---
 import os
@@ -44,8 +64,8 @@ except ImportError as e:
 STREAM_NAME = "EyeGaze"
 STREAM_TYPE = "Gaze"
 CHANNEL_COUNT = 3
-# Use 0.0 for irregular rate; timestamps will be managed by local_clock()
-SAMPLE_RATE = 0.0 
+# Use 30.0 for fixed rate; was 0.0 for irregular rate (causing crashes)
+SAMPLE_RATE = 30.0
 CHANNEL_FORMAT = 'float32'
 SOURCE_ID = 'eyetrax_source_001'
 
@@ -100,7 +120,7 @@ def create_lsl_outlet() -> StreamOutlet:
     
     # Add channel labels as metadata
     chns = info.desc().append_child("channels")
-    for label in ["gaze_x_normalized", "gaze_y_normalized", "pupil_dummy"]:
+    for label in ["gaze_x_normalized", "gaze_y_normalized", "blink"]:
         ch = chns.append_child("channel")
         ch.append_child_value("label", label)
 
@@ -110,6 +130,7 @@ def create_lsl_outlet() -> StreamOutlet:
     gaze_desc.append_child_value("units", "Normalized")
     gaze_desc.append_child_value("range_x", "[0.0, 1.0]")
     gaze_desc.append_child_value("range_y", "[0.0, 1.0]")
+    gaze_desc.append_child_value("blink", "0=eyes_open, 1=blink_detected")
     
     print(f"Creating LSL outlet '{STREAM_NAME}' (Type: {STREAM_TYPE})...")
     # chunk_size=1 means we push one sample at a time
@@ -144,6 +165,12 @@ def run_demo_with_lsl():
     screen_width, screen_height = get_screen_size()
     if screen_width == 0 or screen_height == 0:
         raise ValueError("Could not get valid screen dimensions. Cannot normalize coordinates.")
+    
+    print(f"Screen resolution detected: {screen_width}x{screen_height}")
+    
+    # Validate screen dimensions are reasonable (not corrupted)
+    if screen_width < 100 or screen_width > 10000 or screen_height < 100 or screen_height > 10000:
+        raise ValueError(f"Screen dimensions ({screen_width}x{screen_height}) appear invalid. Please check display settings.")
 
     if filter_method == "kalman":
         kalman = make_kalman()
@@ -201,7 +228,7 @@ def run_demo_with_lsl():
         for frame in iter_frames(cap):
             frame_count += 1
             features, blink_detected = gaze_estimator.extract_features(frame)
-            lsl_sample = [np.nan, np.nan, np.nan] # Default to NaN
+            lsl_sample = None  # Will be set based on blink/gaze state
 
             # --- FaceMesh processing ---
             facemesh_sample = [np.nan] * FACEMESH_CHANNEL_COUNT
@@ -214,53 +241,136 @@ def run_demo_with_lsl():
                 key_indices = [0,33,263,61,291,199,1,13,14,17]
                 for i, idx in enumerate(key_indices):
                     lm = face_landmarks.landmark[idx]
-                    facemesh_sample[i*3+0] = lm.x  # normalized [0,1]
-                    facemesh_sample[i*3+1] = lm.y  # normalized [0,1]
-                    facemesh_sample[i*3+2] = lm.z  # z is relative, in meters
+                    # Validate landmark values before using them
+                    if not (np.isfinite(lm.x) and np.isfinite(lm.y) and np.isfinite(lm.z)):
+                        continue  # Skip invalid landmarks
+                    if abs(lm.x) > 10.0 or abs(lm.y) > 10.0 or abs(lm.z) > 10.0:
+                        continue  # Skip extreme values
+                    
+                    facemesh_sample[i*3+0] = max(0.0, min(1.0, lm.x))  # clamp to [0,1]
+                    facemesh_sample[i*3+1] = max(0.0, min(1.0, lm.y))  # clamp to [0,1]
+                    facemesh_sample[i*3+2] = max(-1.0, min(1.0, lm.z))  # clamp z to reasonable range
 
-            # --- Gaze estimation ---
-            if features is not None and not blink_detected:
-                gaze_point = gaze_estimator.predict(np.array([features]))[0]
-                x, y = map(int, gaze_point)
-                x_pred, y_pred = smoother.step(x, y)
-                contours = smoother.debug.get("contours", [])
-                cursor_alpha = min(cursor_alpha + cursor_step, 1.0)
-
-                # --- LSL Data Preparation ---
-                lsl_gaze_x = x_pred / screen_width
-                lsl_gaze_y = y_pred / screen_height
-                lsl_pupil = 0.0 
-                lsl_gaze_x = max(0.0, min(1.0, lsl_gaze_x))
-                lsl_gaze_y = max(0.0, min(1.0, lsl_gaze_y))
-                lsl_sample = [lsl_gaze_x, lsl_gaze_y, lsl_pupil]
-            else:
+            # --- Gaze estimation and LSL sample preparation ---
+            # Case 1: Blink detected -> send (0, 0, 1)
+            if blink_detected:
+                lsl_sample = [0.0, 0.0, 1.0]
                 x_pred = y_pred = None
-                blink_detected = True
                 contours = []
                 cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
-                # lsl_sample is already [np.nan, np.nan, np.nan]
+            # Case 2: Valid features and no blink -> send (x, y, 0)
+            elif features is not None:
+                gaze_point = gaze_estimator.predict(np.array([features]))[0]
+                x, y = map(int, gaze_point)
+                
+                # Validate raw predictions before smoothing
+                if not (np.isfinite(x) and np.isfinite(y)):
+                    print(f"\nWARNING: Gaze estimator returned non-finite values: ({x}, {y}). Skipping.")
+                    lsl_sample = None
+                    x_pred = y_pred = None
+                    contours = []
+                    cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
+                elif abs(x) > 100000 or abs(y) > 100000:
+                    print(f"\nWARNING: Gaze estimator returned extreme values: ({x}, {y}). Skipping.")
+                    lsl_sample = None
+                    x_pred = y_pred = None
+                    contours = []
+                    cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
+                else:
+                    x_pred, y_pred = smoother.step(x, y)
+                    contours = smoother.debug.get("contours", [])
+                    cursor_alpha = min(cursor_alpha + cursor_step, 1.0)
+
+                    # Normalize gaze coordinates to [0, 1]
+                    # Add safety checks for division by zero and invalid values
+                    if screen_width <= 0 or screen_height <= 0:
+                        print(f"\nWARNING: Invalid screen dimensions ({screen_width}x{screen_height}). Skipping frame.")
+                        lsl_sample = None
+                    elif x_pred is None or y_pred is None or not np.isfinite(x_pred) or not np.isfinite(y_pred):
+                        print(f"\nWARNING: Invalid predicted gaze ({x_pred}, {y_pred}). Skipping frame.")
+                        lsl_sample = None
+                    else:
+                        lsl_gaze_x = x_pred / screen_width
+                        lsl_gaze_y = y_pred / screen_height
+                        
+                        # Additional safety check after division
+                        if not np.isfinite(lsl_gaze_x) or not np.isfinite(lsl_gaze_y):
+                            print(f"\nWARNING: Division resulted in invalid values ({lsl_gaze_x}, {lsl_gaze_y}). Skipping frame.")
+                            lsl_sample = None
+                        else:
+                            # Clamp to valid range
+                            lsl_gaze_x = max(0.0, min(1.0, lsl_gaze_x))
+                            lsl_gaze_y = max(0.0, min(1.0, lsl_gaze_y))
+                            lsl_sample = [lsl_gaze_x, lsl_gaze_y, 0.0]
+            # Case 3: Invalid data (features is None and no blink) -> don't send
+            else:
+                lsl_sample = None
+                x_pred = y_pred = None
+                contours = []
+                cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
 
             # --- Push samples to LSL ---
+            # CRITICAL: Only send valid data to prevent prediction errors/freezes on receiver side
             if outlet:
                 try:
-                    outlet.push_sample(lsl_sample, local_clock())
-                    if not np.isnan(lsl_sample[0]) and not np.isnan(lsl_sample[1]):
-                        gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f}"
+                    if lsl_sample is not None:
+                        # FINAL VALIDATION: Absolutely ensure no invalid values are sent
+                        all_values_valid = True
+                        for val in lsl_sample:
+                            if not isinstance(val, (int, float)) or not np.isfinite(val) or abs(val) > 10.0:
+                                all_values_valid = False
+                                print(f"\nCRITICAL: Blocked invalid gaze sample from being sent: {lsl_sample}")
+                                break
+                        
+                        if all_values_valid:
+                            # Double-check range [0, 1] for x and y
+                            if not (0.0 <= lsl_sample[0] <= 1.0 and 0.0 <= lsl_sample[1] <= 1.0):
+                                print(f"\nCRITICAL: Gaze values out of range [0,1]: {lsl_sample}. Not sending.")
+                            else:
+                                # Send valid data: either (x, y, 0) or (0, 0, 1)
+                                outlet.push_sample(lsl_sample, local_clock())
+                                if lsl_sample[2] == 1.0:
+                                    gaze_data_str = "Gaze: BLINK (0,0,1)"
+                                else:
+                                    gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f} (blink=0)"
+                        else:
+                            gaze_data_str = "Gaze: BLOCKED (invalid values)"
                     else:
-                        gaze_data_str = "Gaze: INVALID"
+                        # Invalid data - skip sending
+                        gaze_data_str = "Gaze: INVALID (not sent)"
                 except Exception as e:
                     gaze_data_str = f"Gaze Error: {e}"
             
             if facemesh_outlet:
                 try:
-                    facemesh_outlet.push_sample(facemesh_sample, local_clock())
-                    # Check if facemesh data is valid
-                    if not np.isnan(facemesh_sample[0]):
-                        # Count valid landmarks
-                        valid_count = sum(1 for i in range(0, 30, 3) if not np.isnan(facemesh_sample[i]))
-                        facemesh_data_str = f"FaceMesh: {valid_count}/10 landmarks"
+                    # FINAL VALIDATION: Absolutely ensure no invalid values are sent
+                    all_valid = True
+                    for i, val in enumerate(facemesh_sample):
+                        if not isinstance(val, (int, float)) or not np.isfinite(val) or abs(val) > 100.0:
+                            all_valid = False
+                            print(f"\nCRITICAL: Blocked invalid FaceMesh sample at index {i}: {val}")
+                            break
+                    
+                    # Only push if facemesh data is valid
+                    if all_valid and not np.isnan(facemesh_sample[0]):
+                        # Additional range check for normalized values (x, y should be in [0, 1])
+                        range_valid = True
+                        for i in range(0, 30, 3):  # Check x and y coordinates
+                            if not (0.0 <= facemesh_sample[i] <= 1.0 and 0.0 <= facemesh_sample[i+1] <= 1.0):
+                                range_valid = False
+                                print(f"\nCRITICAL: FaceMesh coordinate out of range [0,1] at landmark {i//3}: x={facemesh_sample[i]}, y={facemesh_sample[i+1]}")
+                                break
+                        
+                        if range_valid:
+                            facemesh_outlet.push_sample(facemesh_sample, local_clock())
+                            # Count valid landmarks
+                            valid_count = sum(1 for i in range(0, 30, 3) if not np.isnan(facemesh_sample[i]))
+                            facemesh_data_str = f"FaceMesh: {valid_count}/10"
+                        else:
+                            facemesh_data_str = "FaceMesh: BLOCKED (out of range)"
                     else:
-                        facemesh_data_str = "FaceMesh: INVALID"
+                        # Skip sending invalid data
+                        facemesh_data_str = "FaceMesh: INVALID (not sent)"
                 except Exception as e:
                     facemesh_data_str = f"FaceMesh Error: {e}"
             
@@ -277,8 +387,8 @@ def run_demo_with_lsl():
             # Draw normalized gaze area (rectangle)
             gaze_rect = (40, 40, 240, 160)  # x, y, w, h
             cv2.rectangle(canvas, (gaze_rect[0], gaze_rect[1]), (gaze_rect[0]+gaze_rect[2], gaze_rect[1]+gaze_rect[3]), (100,255,100), 2)
-            # Draw gaze point if valid
-            if not np.isnan(lsl_sample[0]) and not np.isnan(lsl_sample[1]):
+            # Draw gaze point if valid (not blinking and not invalid)
+            if lsl_sample is not None and lsl_sample[2] == 0.0:
                 gx = int(gaze_rect[0] + lsl_sample[0] * gaze_rect[2])
                 gy = int(gaze_rect[1] + lsl_sample[1] * gaze_rect[3])
                 cv2.circle(canvas, (gx, gy), 8, (0,255,255), -1)

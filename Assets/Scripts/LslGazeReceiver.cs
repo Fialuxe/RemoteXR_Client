@@ -55,6 +55,36 @@ public class LslGazeReceiver : MonoBehaviour
         try
         {
             ts = _inlet.pull_sample(_sample, pullTimeout);
+            
+            // CRITICAL: Immediately validate ALL raw sample data before any processing
+            bool sampleValid = true;
+            for (int i = 0; i < _sample.Length; i++)
+            {
+                // Check for NaN, Infinity, or extreme values
+                if (float.IsNaN(_sample[i]) || float.IsInfinity(_sample[i]) || 
+                    Mathf.Abs(_sample[i]) > 1e10f)
+                {
+                    Debug.LogWarning($"LSL received corrupted data in channel {i}: {_sample[i]}. Clearing buffer.");
+                    sampleValid = false;
+                    break;
+                }
+                
+                // Additional check: values should be reasonable for normalized coordinates
+                // Gaze: x,y in [0,1], blink in {0,1}
+                if (i < 2 && (_sample[i] < -10f || _sample[i] > 10f))
+                {
+                    Debug.LogWarning($"LSL received out-of-range gaze data in channel {i}: {_sample[i]}. Clearing buffer.");
+                    sampleValid = false;
+                    break;
+                }
+            }
+            
+            if (!sampleValid)
+            {
+                // Clear the sample and skip processing
+                System.Array.Clear(_sample, 0, _sample.Length);
+                ts = 0.0;
+            }
         }
         catch (System.Exception ex)
         {
@@ -69,10 +99,41 @@ public class LslGazeReceiver : MonoBehaviour
             if (logEveryFrame)
             {
                 //Debug.Log($"LSL EyeGaze [t={ts:F3}] x={_sample[0]:F3} y={_sample[1]:F3} pupil={_sample[2]:F3}");
+                
+                // CRITICAL: Final validation before using values
+                float x = _sample[0];
+                float y = _sample[1];
+                
+                // Triple-layer validation
+                // Layer 1: Type check
+                if (float.IsNaN(x) || float.IsInfinity(x) || float.IsNaN(y) || float.IsInfinity(y))
+                {
+                    Debug.LogWarning($"LSL received NaN/Infinity gaze data: x={x}, y={y}. Skipping frame.");
+                    return;
+                }
+                
+                // Layer 2: Range check (extended range for safety)
+                if (x < -10f || x > 10f || y < -10f || y > 10f)
+                {
+                    Debug.LogWarning($"LSL received out-of-range gaze data: x={x}, y={y}. Skipping frame.");
+                    return;
+                }
+                
+                // Layer 3: Sanity check - values should be close to [0,1] for normalized coordinates
+                if (Mathf.Abs(x) > 2f || Mathf.Abs(y) > 2f)
+                {
+                    Debug.LogWarning($"LSL received suspicious gaze data (far from expected range): x={x}, y={y}. Skipping frame.");
+                    return;
+                }
+                
+                // Clamp to valid range [0, 1] as final safety measure
+                x = Mathf.Clamp01(x);
+                y = Mathf.Clamp01(y);
+                
                 var gazeMapper = GetComponent<Map2DGazeToMesh>();
                 if (gazeMapper != null)
                 {
-                    gazeMapper.UpdateGazePosition2D(new Vector2(_sample[0], _sample[1]));
+                    gazeMapper.UpdateGazePosition2D(new Vector2(x, y));
                 }
             }
         }
@@ -102,8 +163,25 @@ public class LslGazeReceiver : MonoBehaviour
 
             if (results.Length > 0)
             {
-                _inlet = new StreamInlet(results[0], max_buflen: 360, max_chunklen: channelCount);
+                // CRITICAL FIX: Set max_buflen to 4 seconds (120 samples at 30 FPS).
+                // Python server now sends with nominal_srate=30.0 instead of IRREGULAR_RATE (0.0).
+                // This prevents buffer allocation issues in liblsl.dylib on Apple M1.
+                _inlet = new StreamInlet(results[0], max_buflen: 4, max_chunklen: 1);
                 _inlet.open_stream(resolveTimeout);
+                
+                // CRITICAL: Flush any old/corrupted data from the buffer
+                Debug.Log($"Flushing LSL inlet buffer to remove any old data...");
+                
+                // Pull and discard all samples currently in the buffer
+                float[] discardSample = new float[channelCount];
+                int flushedCount = 0;
+                while (_inlet.pull_sample(discardSample, 0.0) != 0.0)
+                {
+                    flushedCount++;
+                    if (flushedCount > 1000) break; // Safety limit
+                }
+                Debug.Log($"Flushed {flushedCount} old samples from buffer.");
+                
                 Debug.Log($"Connected LSL inlet to '{results[0].name()}' (type '{results[0].type()}').");
             }
         }
