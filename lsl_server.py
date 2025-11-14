@@ -72,15 +72,48 @@ SOURCE_ID = 'eyetrax_source_001'
 # --- MediaPipe FaceMesh LSL Stream Configuration ---
 FACEMESH_STREAM_NAME = "FaceMesh"
 FACEMESH_STREAM_TYPE = "FaceLandmarks"
-FACEMESH_CHANNEL_COUNT = 10 * 3  # 10 landmark points, each with x,y,z
-FACEMESH_SAMPLE_RATE = 0.0
+FACEMESH_CHANNEL_COUNT = 68 * 3  # 68 landmark points, each with x,y,z
+FACEMESH_SAMPLE_RATE = 30.0
 FACEMESH_CHANNEL_FORMAT = 'float32'
 FACEMESH_SOURCE_ID = 'eyetrax_facemesh_001'
+
+# MediaPipe FaceMesh 68-point landmark mapping
+# Based on facial feature regions for accurate expression tracking
+FACEMESH_68_INDICES = [
+    # Jawline (0-16): 17 points
+    234, 127, 162, 21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454,
+    
+    # Right eyebrow (17-21): 5 points
+    70, 63, 105, 66, 107,
+    
+    # Left eyebrow (22-26): 5 points
+    336, 296, 334, 293, 300,
+    
+    # Nose bridge (27-30): 4 points
+    168, 6, 197, 195,
+    
+    # Nose bottom (31-35): 5 points
+    5, 4, 1, 19, 94,
+    
+    # Right eye (36-41): 6 points
+    33, 160, 158, 133, 153, 144,
+    
+    # Left eye (42-47): 6 points
+    362, 385, 387, 263, 373, 380,
+    
+    # Outer lip (48-59): 12 points
+    61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375,
+    
+    # Inner lip (60-67): 8 points
+    78, 191, 80, 81, 82, 13, 312, 311
+]
+
 # --- End LSL Configuration ---
 def create_facemesh_lsl_outlet(): 
     """
     Creates and returns a new LSL StreamOutlet for MediaPipe FaceMesh data.
-    Sends 10 key landmark points (x, y, z) for avatar expression, normalized to [0,1] (x, y) and z in meters.
+    Sends 68 key landmark points (x, y, z) for avatar expression, normalized to [0,1] (x, y) and z in meters.
+    Based on the standard 68-point facial landmark model.
     """
     info = StreamInfo(
         FACEMESH_STREAM_NAME,
@@ -91,17 +124,36 @@ def create_facemesh_lsl_outlet():
         FACEMESH_SOURCE_ID,
     )
     chns = info.desc().append_child("channels")
-    # Use 10 key points: 0(nose tip), 33(right eye), 263(left eye), 61(mouth right), 291(mouth left), 199(chin), 1(forehead), 13(upper lip), 14(lower lip), 17(right cheek)
-    landmark_names = ["nose_tip", "right_eye", 
-                      "left_eye", "mouth_right", 
-                      "mouth_left", "chin", 
-                      "forehead", "upper_lip", 
-                      "lower_lip", "right_cheek"]
-    for name in landmark_names:
+    
+    # Define landmark names based on facial regions
+    landmark_regions = [
+        # Jawline (0-16)
+        *[f"jaw_{i}" for i in range(17)],
+        # Right eyebrow (17-21)
+        *[f"right_brow_{i}" for i in range(5)],
+        # Left eyebrow (22-26)
+        *[f"left_brow_{i}" for i in range(5)],
+        # Nose bridge (27-30)
+        *[f"nose_bridge_{i}" for i in range(4)],
+        # Nose bottom (31-35)
+        *[f"nose_bottom_{i}" for i in range(5)],
+        # Right eye (36-41)
+        *[f"right_eye_{i}" for i in range(6)],
+        # Left eye (42-47)
+        *[f"left_eye_{i}" for i in range(6)],
+        # Outer lip (48-59)
+        *[f"outer_lip_{i}" for i in range(12)],
+        # Inner lip (60-67)
+        *[f"inner_lip_{i}" for i in range(8)]
+    ]
+    
+    for name in landmark_regions:
         for axis in ["x", "y", "z"]:
             ch = chns.append_child("channel")
             ch.append_child_value("label", f"{name}_{axis}")
-    info.desc().append_child_value("description", "10 MediaPipe FaceMesh keypoints (x,y normalized [0,1], z in meters)")
+    
+    info.desc().append_child_value("description", 
+        "68 MediaPipe FaceMesh landmarks (x,y normalized [0,1], z in meters) - Standard facial landmark model")
     return StreamOutlet(info, chunk_size=1, max_buffered=360)
 
 
@@ -224,6 +276,12 @@ def run_demo_with_lsl():
         frame_count = 0
         gaze_data_str = "N/A"
         facemesh_data_str = "N/A"
+        
+        # Frame rate control for 30fps fixed rate
+        target_fps = 30.0
+        frame_interval = 1.0 / target_fps
+        last_gaze_send_time = 0.0
+        last_facemesh_send_time = 0.0
 
         for frame in iter_frames(cap):
             frame_count += 1
@@ -237,9 +295,9 @@ def run_demo_with_lsl():
             if results.multi_face_landmarks:
                 # Use first detected face
                 face_landmarks = results.multi_face_landmarks[0]
-                # 10 key indices: 0,33,263,61,291,199,1,13,14,17
-                key_indices = [0,33,263,61,291,199,1,13,14,17]
-                for i, idx in enumerate(key_indices):
+                
+                # Extract 68 landmark points
+                for i, idx in enumerate(FACEMESH_68_INDICES):
                     lm = face_landmarks.landmark[idx]
                     # Validate landmark values before using them
                     if not (np.isfinite(lm.x) and np.isfinite(lm.y) and np.isfinite(lm.z)):
@@ -311,6 +369,9 @@ def run_demo_with_lsl():
 
             # --- Push samples to LSL ---
             # CRITICAL: Only send valid data to prevent prediction errors/freezes on receiver side
+            # Apply 30fps rate limiting for both gaze and facemesh
+            current_time = time.time()
+            
             if outlet:
                 try:
                     if lsl_sample is not None:
@@ -327,12 +388,17 @@ def run_demo_with_lsl():
                             if not (0.0 <= lsl_sample[0] <= 1.0 and 0.0 <= lsl_sample[1] <= 1.0):
                                 print(f"\nCRITICAL: Gaze values out of range [0,1]: {lsl_sample}. Not sending.")
                             else:
-                                # Send valid data: either (x, y, 0) or (0, 0, 1)
-                                outlet.push_sample(lsl_sample, local_clock())
-                                if lsl_sample[2] == 1.0:
-                                    gaze_data_str = "Gaze: BLINK (0,0,1)"
+                                # Apply 30fps rate limiting
+                                if current_time - last_gaze_send_time >= frame_interval:
+                                    # Send valid data: either (x, y, 0) or (0, 0, 1)
+                                    outlet.push_sample(lsl_sample, local_clock())
+                                    last_gaze_send_time = current_time
+                                    if lsl_sample[2] == 1.0:
+                                        gaze_data_str = "Gaze: BLINK (0,0,1)"
+                                    else:
+                                        gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f} (blink=0)"
                                 else:
-                                    gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f} (blink=0)"
+                                    gaze_data_str = "Gaze: SKIPPED (rate limit)"
                         else:
                             gaze_data_str = "Gaze: BLOCKED (invalid values)"
                     else:
@@ -362,10 +428,15 @@ def run_demo_with_lsl():
                                 break
                         
                         if range_valid:
-                            facemesh_outlet.push_sample(facemesh_sample, local_clock())
-                            # Count valid landmarks
-                            valid_count = sum(1 for i in range(0, 30, 3) if not np.isnan(facemesh_sample[i]))
-                            facemesh_data_str = f"FaceMesh: {valid_count}/10"
+                            # Apply 30fps rate limiting for facemesh (same as gaze)
+                            if current_time - last_facemesh_send_time >= frame_interval:
+                                facemesh_outlet.push_sample(facemesh_sample, local_clock())
+                                last_facemesh_send_time = current_time
+                                # Count valid landmarks
+                                valid_count = sum(1 for i in range(0, 30, 3) if not np.isnan(facemesh_sample[i]))
+                                facemesh_data_str = f"FaceMesh: {valid_count}/10"
+                            else:
+                                facemesh_data_str = "FaceMesh: SKIPPED (rate limit)"
                         else:
                             facemesh_data_str = "FaceMesh: BLOCKED (out of range)"
                     else:

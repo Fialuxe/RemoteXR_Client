@@ -591,6 +591,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6302654517782935371, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 7570508639197865786, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
     m_RemovedGameObjects: []
@@ -599,6 +603,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1552418032959293430, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1965130489}
+    - targetCorrespondingSourceObject: {fileID: 1552418032959293430, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1965130493}
+    - targetCorrespondingSourceObject: {fileID: 1552418032959293430, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1965130495}
+    - targetCorrespondingSourceObject: {fileID: 1552418032959293430, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1965130494}
   m_SourcePrefab: {fileID: 100100000, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
 --- !u!1 &1167339786
 GameObject:
@@ -837,6 +850,73 @@ MonoBehaviour:
   lineEndColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   showDebugInfo: 1
   enableSimulation: 0
+  simulationSpeed: 0.5
+--- !u!114 &1965130493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965130484}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28591dbedcc524ed495b0758f1137836, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FaceMeshVisualizer
+  showPoints: 1
+  showWireframe: 1
+  pointSize: 0.01
+  meshScale: 2
+  visualizationOffset: {x: 0, y: 1.5, z: 2}
+  pointColor: {r: 0, g: 1, b: 0, a: 1}
+  wireframeColor: {r: 0, g: 1, b: 0, a: 0.5}
+  eyeColor: {r: 0, g: 1, b: 1, a: 1}
+  mouthColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  browColor: {r: 1, g: 0, b: 1, a: 1}
+  mirrorHorizontally: 1
+  flipVertically: 0
+--- !u!114 &1965130494
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965130484}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42f4ccd2c13814dc3a70d57fd97ee21c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GazeVisualizationManager
+  rayVisualizer: {fileID: 1965130489}
+  frustumVisualizer: {fileID: 1965130495}
+  currentMode: 0
+  enableKeyboardToggle: 1
+  toggleKey: 9
+  showDebugInfo: 0
+--- !u!114 &1965130495
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965130484}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b237691f26bea41b4a5d8f80ea3854ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GazeFrustumVisualizer
+  cameraTransform: {fileID: 330585546}
+  frustumDistance: 5
+  frustumStartDistance: 0.3
+  horizontalFOV: 30
+  verticalFOV: 20
+  frustumColor: {r: 0, g: 1, b: 1, a: 0.7}
+  lineWidth: 0.005
+  showNearPlane: 1
+  showFarPlane: 1
+  gazeOffset: {x: 0, y: 0}
+  showDebugInfo: 0
+  enableSimulation: 1
   simulationSpeed: 0.5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

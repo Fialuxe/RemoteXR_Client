@@ -130,10 +130,20 @@ public class LslGazeReceiver : MonoBehaviour
                 x = Mathf.Clamp01(x);
                 y = Mathf.Clamp01(y);
                 
-                var gazeMapper = GetComponent<Map2DGazeToMesh>();
-                if (gazeMapper != null)
+                // Try to use GazeVisualizationManager first (new system)
+                var vizManager = GetComponent<GazeVisualizationManager>();
+                if (vizManager != null)
                 {
-                    gazeMapper.UpdateGazePosition2D(new Vector2(x, y));
+                    vizManager.UpdateGazePosition2D(new Vector2(x, y));
+                }
+                else
+                {
+                    // Fallback to legacy Map2DGazeToMesh for backward compatibility
+                    var gazeMapper = GetComponent<Map2DGazeToMesh>();
+                    if (gazeMapper != null)
+                    {
+                        gazeMapper.UpdateGazePosition2D(new Vector2(x, y));
+                    }
                 }
             }
         }
