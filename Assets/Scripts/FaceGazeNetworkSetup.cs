@@ -61,6 +61,8 @@ public class FaceGazeNetworkSetup : MonoBehaviour
     {
         Debug.Log("Setting up Remote Client (Transmitter)...");
 
+        PhotonView photonView = GetComponent<PhotonView>();
+
         // Add LSL receivers if not present
         LslFaceMeshReceiver faceMeshReceiver = GetComponent<LslFaceMeshReceiver>();
         if (faceMeshReceiver == null)
@@ -91,6 +93,13 @@ public class FaceGazeNetworkSetup : MonoBehaviour
             Debug.Log("Added PhotonFaceGazeTransmitter");
         }
 
+        // CRITICAL: Register transmitter in PhotonView.ObservedComponents
+        if (photonView != null && !photonView.ObservedComponents.Contains(transmitter))
+        {
+            photonView.ObservedComponents.Add(transmitter);
+            Debug.Log("✓ Registered PhotonFaceGazeTransmitter in PhotonView.ObservedComponents");
+        }
+
         Debug.Log("Remote Client setup complete!");
     }
 
@@ -98,12 +107,21 @@ public class FaceGazeNetworkSetup : MonoBehaviour
     {
         Debug.Log("Setting up Local Client (Receiver)...");
 
+        PhotonView photonView = GetComponent<PhotonView>();
+
         // Add transmitter if not present (for receiving data)
         PhotonFaceGazeTransmitter transmitter = GetComponent<PhotonFaceGazeTransmitter>();
         if (transmitter == null)
         {
             transmitter = gameObject.AddComponent<PhotonFaceGazeTransmitter>();
             Debug.Log("Added PhotonFaceGazeTransmitter for receiving");
+        }
+
+        // CRITICAL: Register transmitter in PhotonView.ObservedComponents
+        if (photonView != null && !photonView.ObservedComponents.Contains(transmitter))
+        {
+            photonView.ObservedComponents.Add(transmitter);
+            Debug.Log("✓ Registered PhotonFaceGazeTransmitter in PhotonView.ObservedComponents");
         }
 
         // Add receiver/visualizer if not present
