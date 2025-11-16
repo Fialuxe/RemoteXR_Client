@@ -85,6 +85,13 @@ public class RemoteClient : MonoBehaviourPunCallbacks
         if (remotePlayerRepresentation == null)
             return;
         
+        PhotonView photonView = remotePlayerRepresentation.GetComponent<PhotonView>();
+        if (photonView == null)
+        {
+            Debug.LogError("RemoteClient: PhotonView not found on player representation!");
+            return;
+        }
+        
         // Add LSL receivers for face and gaze data
         LslFaceMeshReceiver faceMeshReceiver = remotePlayerRepresentation.GetComponent<LslFaceMeshReceiver>();
         if (faceMeshReceiver == null)
@@ -111,6 +118,13 @@ public class RemoteClient : MonoBehaviourPunCallbacks
             transmitter.transmitFaceMesh = true;
             transmitter.transmitGaze = true;
             Debug.Log("Added PhotonFaceGazeTransmitter to remote player");
+        }
+        
+        // CRITICAL: Register transmitter in PhotonView.ObservedComponents
+        if (!photonView.ObservedComponents.Contains(transmitter))
+        {
+            photonView.ObservedComponents.Add(transmitter);
+            Debug.Log("✓ Registered PhotonFaceGazeTransmitter in PhotonView.ObservedComponents");
         }
     }
 
