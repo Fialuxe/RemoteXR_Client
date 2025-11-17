@@ -189,26 +189,16 @@ public class AlignmentCalibrationTool : MonoBehaviourPunCallbacks
 
     void SaveAlignment()
     {
-        PlayerPrefs.SetFloat("AlignmentOffsetX", manualOffset.x);
-        PlayerPrefs.SetFloat("AlignmentOffsetY", manualOffset.y);
-        PlayerPrefs.SetFloat("AlignmentOffsetZ", manualOffset.z);
-        PlayerPrefs.SetFloat("AlignmentRotationX", manualRotation.x);
-        PlayerPrefs.SetFloat("AlignmentRotationY", manualRotation.y);
-        PlayerPrefs.SetFloat("AlignmentRotationZ", manualRotation.z);
-        PlayerPrefs.Save();
+        AlignmentPersistence.SaveOffsets("AlignmentCalibration_", manualOffset, manualRotation);
         Debug.Log("<color=green>Alignment saved!</color>");
     }
 
     void LoadAlignment()
     {
-        if (PlayerPrefs.HasKey("AlignmentOffsetX"))
+        if (AlignmentPersistence.LoadOffsets("AlignmentCalibration_", out Vector3 offset, out Vector3 rotation))
         {
-            manualOffset.x = PlayerPrefs.GetFloat("AlignmentOffsetX");
-            manualOffset.y = PlayerPrefs.GetFloat("AlignmentOffsetY");
-            manualOffset.z = PlayerPrefs.GetFloat("AlignmentOffsetZ");
-            manualRotation.x = PlayerPrefs.GetFloat("AlignmentRotationX");
-            manualRotation.y = PlayerPrefs.GetFloat("AlignmentRotationY");
-            manualRotation.z = PlayerPrefs.GetFloat("AlignmentRotationZ");
+            manualOffset = offset;
+            manualRotation = rotation;
             
             if (alignmentManager != null)
             {
