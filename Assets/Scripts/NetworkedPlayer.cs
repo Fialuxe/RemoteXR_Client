@@ -21,6 +21,13 @@ public class NetworkedPlayer : MonoBehaviourPun, IPunObservable
         // Find the alignment manager
         alignmentManager = FindFirstObjectByType<SpatialAlignmentManager>();
         
+        // CRITICAL: Ensure this component is registered in PhotonView.ObservedComponents
+        if (photonView != null && !photonView.ObservedComponents.Contains(this))
+        {
+            photonView.ObservedComponents.Add(this);
+            Debug.Log($"✓ Registered NetworkedPlayer in PhotonView.ObservedComponents for {photonView.Owner?.NickName}");
+        }
+        
         // Color the player based on ownership
         Renderer renderer = GetComponent<Renderer>();
         if (renderer != null)
