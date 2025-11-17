@@ -4,6 +4,10 @@ using Photon.Realtime;
 
 public class RemoteClient : MonoBehaviourPunCallbacks
 {
+    [Header("Client Type")]
+    [Tooltip("If true, instantiates player and transmits data (Remote/AR device). If false, only observes (Local/Desktop).")]
+    public bool isTransmitter = true;
+    
     [Header("Fly Camera Settings")]
     public float moveSpeed = 5f;
     public float fastMultiplier = 3f;
@@ -21,6 +25,17 @@ public class RemoteClient : MonoBehaviourPunCallbacks
 
     void Start()
     {
+        // ★ CRITICAL: Ensure AlignmentNetworkHub exists
+        AlignmentNetworkHub hub = FindFirstObjectByType<AlignmentNetworkHub>();
+        if (hub == null)
+        {
+            Debug.LogWarning("[RemoteClient] AlignmentNetworkHub not found in scene! Creating one...");
+            GameObject hubObj = new GameObject("AlignmentNetworkHub");
+            hub = hubObj.AddComponent<AlignmentNetworkHub>();
+            PhotonView pv = hubObj.AddComponent<PhotonView>();
+            Debug.Log("[RemoteClient] ✓ AlignmentNetworkHub created with PhotonView");
+        }
+        
         // Resolve camera and seed pose
         activeCam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
         if (activeCam != null)
@@ -38,8 +53,19 @@ public class RemoteClient : MonoBehaviourPunCallbacks
         }
         
         // Auto-connect to Photon
-        PhotonNetwork.ConnectUsingSettings();
-        PhotonNetwork.NickName = "RemoteUser_" + Random.Range(1000, 9999);
+        if (!PhotonNetwork.IsConnected)
+        {
+            Debug.Log("[RemoteClient] Starting Photon connection...");
+            Debug.Log($"[RemoteClient] App ID configured: {PhotonNetwork.PhotonServerSettings?.AppSettings?.AppIdRealtime != null}");
+            
+            PhotonNetwork.ConnectUsingSettings();
+            PhotonNetwork.NickName = "RemoteUser_" + Random.Range(1000, 9999);
+            Debug.Log($"[RemoteClient] Connecting with nickname: {PhotonNetwork.NickName}");
+        }
+        else
+        {
+            Debug.Log("[RemoteClient] Already connected to Photon!");
+        }
     }
 
     public override void OnConnectedToMaster()
@@ -49,22 +75,127 @@ public class RemoteClient : MonoBehaviourPunCallbacks
         PhotonNetwork.JoinOrCreateRoom("MeshVRRoom", new RoomOptions { MaxPlayers = 4 }, TypedLobby.Default);
     }
 
+    public override void OnDisconnected(DisconnectCause cause)
+    {
+        Debug.LogError($"[RemoteClient] Disconnected! Cause: {cause}");
+        
+        // Retry on timeout errors (includes NameServer timeout, AppOutOfFocus, etc)
+        if (cause == DisconnectCause.ServerTimeout ||
+            cause == DisconnectCause.ClientTimeout ||
+            cause == DisconnectCause.ExceptionOnConnect ||
+            cause == DisconnectCause.DnsExceptionOnConnect ||
+            cause == DisconnectCause.Exception)
+        {
+            Debug.LogWarning($"[RemoteClient] Connection error ({cause}). Retrying in 3 seconds...");
+            CancelInvoke(nameof(RetryConnection));  // Cancel any pending retry
+            Invoke(nameof(RetryConnection), 3f);
+        }
+    }
+
+    void RetryConnection()
+    {
+        if (!PhotonNetwork.IsConnected)
+        {
+            Debug.Log("[RemoteClient] Retrying Photon connection...");
+            PhotonNetwork.ConnectUsingSettings();
+        }
+        else
+        {
+            Debug.Log("[RemoteClient] Already connected, retry cancelled");
+        }
+    }
+
     public override void OnJoinedRoom()
     {
         Debug.Log("RemoteClient joined room: " + PhotonNetwork.CurrentRoom.Name);
         Debug.Log("Players in room: " + PhotonNetwork.CurrentRoom.PlayerCount);
 
-        // Instantiate player representation
-        // Spawn at a different location to avoid overlap
-        Vector3 spawnPos = new Vector3(Random.Range(-2f, 2f), 1.5f, Random.Range(-2f, 2f));
-        remotePlayerRepresentation = PhotonNetwork.Instantiate("LocalClientCube", spawnPos, Quaternion.identity);
-        remotePlayerRepresentation.name = "RemotePlayer_" + PhotonNetwork.NickName;
-        
-        remotePosition = spawnPos;
+        // Only instantiate player if this is a transmitter (remote client)
+        if (isTransmitter)
+        {
+            // Instantiate player representation
+            // Spawn at a different location to avoid overlap
+            Vector3 spawnPos = new Vector3(Random.Range(-2f, 2f), 1.5f, Random.Range(-2f, 2f));
+            remotePlayerRepresentation = PhotonNetwork.Instantiate("LocalClientCube", spawnPos, Quaternion.identity);
+            remotePlayerRepresentation.name = "RemotePlayer_" + PhotonNetwork.NickName;
+            
+            remotePosition = spawnPos;
+            
+            // Set up face and gaze transmission
+            SetupFaceGazeTransmission();
+            
+            Debug.Log("Transmitter mode: Player instantiated and LSL setup initiated");
+        }
+        else
+        {
+            Debug.Log("Receiver mode: NOT instantiating player - will observe remote players only");
+        }
     }
+    
+    private void SetupFaceGazeTransmission()
+    {
+        if (remotePlayerRepresentation == null)
+            return;
+        
+        PhotonView photonView = remotePlayerRepresentation.GetComponent<PhotonView>();
+        if (photonView == null)
+        {
+            Debug.LogError("RemoteClient: PhotonView not found on player representation!");
+            return;
+        }
+        
+        // Add LSL receivers for face and gaze data
+        LslFaceMeshReceiver faceMeshReceiver = remotePlayerRepresentation.GetComponent<LslFaceMeshReceiver>();
+        if (faceMeshReceiver == null)
+        {
+            faceMeshReceiver = remotePlayerRepresentation.AddComponent<LslFaceMeshReceiver>();
+            Debug.Log("Added LslFaceMeshReceiver to remote player");
+        }
+        
+        LslGazeReceiver gazeReceiver = remotePlayerRepresentation.GetComponent<LslGazeReceiver>();
+        if (gazeReceiver == null)
+        {
+            gazeReceiver = remotePlayerRepresentation.AddComponent<LslGazeReceiver>();
+            Debug.Log("Added LslGazeReceiver to remote player");
+        }
+        
+        // Add Photon transmitter
+        PhotonFaceGazeTransmitter transmitter = remotePlayerRepresentation.GetComponent<PhotonFaceGazeTransmitter>();
+        if (transmitter == null)
+        {
+            transmitter = remotePlayerRepresentation.AddComponent<PhotonFaceGazeTransmitter>();
+            transmitter.faceMeshReceiver = faceMeshReceiver;
+            transmitter.gazeReceiver = gazeReceiver;
+            transmitter.transmissionInterval = 2; // Send every 2 frames for bandwidth efficiency
+            transmitter.transmitFaceMesh = true;
+            transmitter.transmitGaze = true;
+            Debug.Log("Added PhotonFaceGazeTransmitter to remote player");
+        }
+        
+        // CRITICAL: Register transmitter in PhotonView.ObservedComponents
+        if (!photonView.ObservedComponents.Contains(transmitter))
+        {
+            photonView.ObservedComponents.Add(transmitter);
+            Debug.Log("✓ Registered PhotonFaceGazeTransmitter in PhotonView.ObservedComponents");
+        }
+    }
+
+    private float lastConnectionCheckTime = 0f;
+    private const float CONNECTION_CHECK_INTERVAL = 5f;
 
     void Update()
     {
+        // Monitor connection status periodically
+        if (Time.time - lastConnectionCheckTime > CONNECTION_CHECK_INTERVAL)
+        {
+            lastConnectionCheckTime = Time.time;
+            
+            if (!PhotonNetwork.IsConnected)
+            {
+                Debug.LogWarning("[RemoteClient] Connection lost! Status: " + PhotonNetwork.NetworkClientState);
+            }
+        }
+
         if (activeCam == null)
         {
             activeCam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();

@@ -33,6 +33,41 @@ public class LslGazeReceiver : MonoBehaviour
 
     public bool IsConnected => _inlet != null;
 
+    // Public accessors for gaze data
+    public Vector2 GetGazePosition()
+    {
+        if (_sample == null || _sample.Length < 2)
+            return Vector2.zero;
+        
+        float x = _sample[0];
+        float y = _sample[1];
+        
+        // Validate data before returning
+        if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y))
+            return Vector2.zero;
+        
+        return new Vector2(x, y);
+    }
+
+    public float GetPupilSize()
+    {
+        if (_sample == null || _sample.Length < 3)
+            return 0f;
+        
+        float pupil = _sample[2];
+        
+        // Validate data before returning
+        if (float.IsNaN(pupil) || float.IsInfinity(pupil))
+            return 0f;
+        
+        return pupil;
+    }
+
+    public double GetLastTimestamp()
+    {
+        return _lastTimestamp;
+    }
+
     private void Start()
     {
         TryConnect();

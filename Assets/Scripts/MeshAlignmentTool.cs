@@ -7,10 +7,9 @@ using Photon.Pun;
 /// Once aligned, save the transformation for consistent alignment
 /// 
 /// NOTE: PhotonView Configuration:
-/// - This component uses RPC calls only (no continuous synchronization needed)
-/// - Add PhotonView component to this GameObject
-/// - Observed Components can be left EMPTY - that's correct!
-/// - We only send mesh alignment via RPC when user saves
+/// - This component NO LONGER needs PhotonView!
+/// - Networking is handled by AlignmentNetworkHub
+/// - We only send mesh alignment via the hub when user saves
 /// </summary>
 public class MeshAlignmentTool : MonoBehaviourPunCallbacks
 {
@@ -78,6 +77,20 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         {
             EnableAlignmentMode();
         }
+        
+        // Subscribe to network events to receive alignment from others
+        AlignmentNetworkHub.OnMeshAlignmentReceived += HandleMeshAlignmentReceived;
+    }
+
+    void OnDestroy()
+    {
+        if (alignmentGrid != null)
+        {
+            Destroy(alignmentGrid);
+        }
+        
+        // Unsubscribe from network events
+        AlignmentNetworkHub.OnMeshAlignmentReceived -= HandleMeshAlignmentReceived;
     }
 
     void Update()
@@ -257,9 +270,10 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         }
         
         // Broadcast to other clients that we're in alignment mode
-        if (PhotonNetwork.InRoom)
+        if (PhotonNetwork.InRoom && AlignmentNetworkHub.IsReady)
         {
-            photonView.RPC("OnAlignmentModeChanged", RpcTarget.Others, true);
+            // Note: We could add a specific RPC for alignment mode state if needed
+            Debug.Log("Alignment mode enabled - other clients will be notified when you save");
         }
     }
 
@@ -272,12 +286,6 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         {
             Destroy(alignmentGrid);
         }
-        
-        // Broadcast to other clients
-        if (PhotonNetwork.InRoom)
-        {
-            photonView.RPC("OnAlignmentModeChanged", RpcTarget.Others, false);
-        }
     }
 
     public void ToggleAlignmentMode()
@@ -288,10 +296,17 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
             EnableAlignmentMode();
     }
 
-    [PunRPC]
-    void OnAlignmentModeChanged(bool isEnabled)
+    void HandleMeshAlignmentReceived(Vector3 position, Quaternion rotation, Vector3 scale)
     {
-        Debug.Log($"Remote user {(isEnabled ? "entered" : "exited")} alignment mode");
+        if (scannedMesh != null)
+        {
+            scannedMesh.position = position;
+            scannedMesh.rotation = rotation;
+            scannedMesh.localScale = scale;
+            
+            Debug.Log($"<color=cyan>Received mesh alignment update from remote user</color>");
+            Debug.Log($"Position: {position}");
+        }
     }
 
     public void SaveAlignment()
@@ -300,59 +315,28 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         savedRotation = scannedMesh.rotation;
         savedScale = scannedMesh.localScale;
         
-        // Save to PlayerPrefs
-        PlayerPrefs.SetFloat(saveKey + "PosX", savedPosition.x);
-        PlayerPrefs.SetFloat(saveKey + "PosY", savedPosition.y);
-        PlayerPrefs.SetFloat(saveKey + "PosZ", savedPosition.z);
-        
-        PlayerPrefs.SetFloat(saveKey + "RotX", savedRotation.x);
-        PlayerPrefs.SetFloat(saveKey + "RotY", savedRotation.y);
-        PlayerPrefs.SetFloat(saveKey + "RotZ", savedRotation.z);
-        PlayerPrefs.SetFloat(saveKey + "RotW", savedRotation.w);
-        
-        PlayerPrefs.SetFloat(saveKey + "ScaleX", savedScale.x);
-        PlayerPrefs.SetFloat(saveKey + "ScaleY", savedScale.y);
-        PlayerPrefs.SetFloat(saveKey + "ScaleZ", savedScale.z);
-        
-        PlayerPrefs.Save();
+        // Save using AlignmentPersistence utility
+        AlignmentPersistence.SaveTransform(saveKey, savedPosition, savedRotation, savedScale);
         
         Debug.Log($"<color=green>✓ Mesh alignment SAVED!</color>");
         Debug.Log($"Position: {savedPosition}");
         Debug.Log($"Rotation: {savedRotation.eulerAngles}");
         Debug.Log($"Scale: {savedScale}");
         
-        // Broadcast the new alignment to other clients
-        if (PhotonNetwork.InRoom)
+        // Broadcast the new alignment to other clients via the network hub
+        if (PhotonNetwork.InRoom && AlignmentNetworkHub.IsReady)
         {
-            photonView.RPC("ReceiveMeshAlignment", RpcTarget.Others,
-                savedPosition.x, savedPosition.y, savedPosition.z,
-                savedRotation.x, savedRotation.y, savedRotation.z, savedRotation.w,
-                savedScale.x, savedScale.y, savedScale.z);
+            AlignmentNetworkHub.BroadcastMeshAlignment(savedPosition, savedRotation, savedScale);
         }
     }
 
     public void LoadAlignment()
     {
-        if (PlayerPrefs.HasKey(saveKey + "PosX"))
+        if (AlignmentPersistence.LoadTransform(saveKey, out Vector3 pos, out Quaternion rot, out Vector3 scale))
         {
-            savedPosition = new Vector3(
-                PlayerPrefs.GetFloat(saveKey + "PosX"),
-                PlayerPrefs.GetFloat(saveKey + "PosY"),
-                PlayerPrefs.GetFloat(saveKey + "PosZ")
-            );
-            
-            savedRotation = new Quaternion(
-                PlayerPrefs.GetFloat(saveKey + "RotX"),
-                PlayerPrefs.GetFloat(saveKey + "RotY"),
-                PlayerPrefs.GetFloat(saveKey + "RotZ"),
-                PlayerPrefs.GetFloat(saveKey + "RotW")
-            );
-            
-            savedScale = new Vector3(
-                PlayerPrefs.GetFloat(saveKey + "ScaleX"),
-                PlayerPrefs.GetFloat(saveKey + "ScaleY"),
-                PlayerPrefs.GetFloat(saveKey + "ScaleZ")
-            );
+            savedPosition = pos;
+            savedRotation = rot;
+            savedScale = scale;
             
             scannedMesh.position = savedPosition;
             scannedMesh.rotation = savedRotation;
@@ -365,24 +349,6 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         else
         {
             Debug.Log("<color=yellow>No saved alignment found. Using default position.</color>");
-        }
-    }
-
-    [PunRPC]
-    void ReceiveMeshAlignment(float px, float py, float pz, float rx, float ry, float rz, float rw, float sx, float sy, float sz)
-    {
-        Vector3 newPosition = new Vector3(px, py, pz);
-        Quaternion newRotation = new Quaternion(rx, ry, rz, rw);
-        Vector3 newScale = new Vector3(sx, sy, sz);
-        
-        if (scannedMesh != null)
-        {
-            scannedMesh.position = newPosition;
-            scannedMesh.rotation = newRotation;
-            scannedMesh.localScale = newScale;
-            
-            Debug.Log($"<color=cyan>Received mesh alignment update from VR user</color>");
-            Debug.Log($"Position: {newPosition}");
         }
     }
 
@@ -488,14 +454,6 @@ public class MeshAlignmentTool : MonoBehaviourPunCallbacks
         if (autoSaveOnExit && alignmentMode)
         {
             SaveAlignment();
-        }
-    }
-
-    void OnDestroy()
-    {
-        if (alignmentGrid != null)
-        {
-            Destroy(alignmentGrid);
         }
     }
 }
