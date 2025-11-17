@@ -772,7 +772,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a77d605bdac00174582dd022a02464a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpatialAlignmentManager
-  meshReferencePoint: {fileID: 0}
+  meshReferencePoint: {fileID: 195621591}
   alignmentMode: 0
   positionOffset: {x: 0, y: 0, z: 0}
   rotationOffset: {x: 0, y: 0, z: 0}

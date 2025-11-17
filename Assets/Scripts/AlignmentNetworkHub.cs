@@ -6,6 +6,7 @@ using System;
 /// Centralized network event hub for all alignment-related RPC calls
 /// This is the ONLY script that needs a PhotonView for alignment networking
 /// Other scripts can use static methods or subscribe to events
+/// Assymetric design so that this script can be attached to either LocalClient or RemoteClient
 /// </summary>
 public class AlignmentNetworkHub : MonoBehaviourPunCallbacks
 {
@@ -14,6 +15,11 @@ public class AlignmentNetworkHub : MonoBehaviourPunCallbacks
     // Events for alignment data
     public static event Action<int, Vector3, Quaternion> OnSpatialAlignmentReceived;
     public static event Action<Vector3, Quaternion, Vector3> OnMeshAlignmentReceived;
+    public static event Action<bool> OnMeshAlignmentModeChanged;
+    
+    // Events for face and gaze data
+    public static event Action<int, Vector3[], bool> OnFaceLandmarksReceived;  // playerId, landmarks, hasData
+    public static event Action<int, Vector2, float, bool> OnGazeDataReceived;  // playerId, gazePos, pupilSize, hasData
 
     void Awake()
     {
@@ -95,6 +101,124 @@ public class AlignmentNetworkHub : MonoBehaviourPunCallbacks
         Debug.Log($"<color=cyan>[AlignmentHub] Received mesh alignment update</color>");
         
         OnMeshAlignmentReceived?.Invoke(position, rotation, scale);
+    }
+
+    #endregion
+
+    #region Mesh Alignment Mode (for synchronized mode switching)
+
+    /// <summary>
+    /// Broadcast mesh alignment mode change to all other clients
+    /// </summary>
+    public static void BroadcastMeshAlignmentModeChanged(bool isEnabled)
+    {
+        if (instance == null || !PhotonNetwork.InRoom)
+        {
+            Debug.LogWarning("AlignmentNetworkHub: Not connected to broadcast mesh alignment mode");
+            return;
+        }
+
+        instance.photonView.RPC(
+            "ReceiveMeshAlignmentModeChanged",
+            RpcTarget.Others,
+            isEnabled
+        );
+    }
+
+    [PunRPC]
+    void ReceiveMeshAlignmentModeChanged(bool isEnabled)
+    {
+        Debug.Log($"<color=cyan>[AlignmentHub] Remote user {(isEnabled ? "entered" : "exited")} mesh alignment mode</color>");
+        
+        OnMeshAlignmentModeChanged?.Invoke(isEnabled);
+    }
+
+    #endregion
+
+    #region Face and Gaze Data (PhotonFaceGazeTransmitter)
+
+    /// <summary>
+    /// Broadcast face landmarks data to all other clients
+    /// </summary>
+    public static void BroadcastFaceLandmarks(Vector3[] landmarks)
+    {
+        if (instance == null || !PhotonNetwork.InRoom || landmarks == null)
+        {
+            Debug.LogWarning("AlignmentNetworkHub: Cannot broadcast face landmarks");
+            return;
+        }
+
+        // Convert Vector3 array to float array for RPC transmission
+        float[] landmarkData = new float[landmarks.Length * 3];
+        for (int i = 0; i < landmarks.Length; i++)
+        {
+            landmarkData[i * 3] = landmarks[i].x;
+            landmarkData[i * 3 + 1] = landmarks[i].y;
+            landmarkData[i * 3 + 2] = landmarks[i].z;
+        }
+
+        instance.photonView.RPC(
+            "ReceiveFaceLandmarks",
+            RpcTarget.Others,
+            PhotonNetwork.LocalPlayer.ActorNumber,
+            landmarkData,
+            true
+        );
+    }
+
+    /// <summary>
+    /// Broadcast gaze data to all other clients
+    /// </summary>
+    public static void BroadcastGazeData(Vector2 gazePosition, float pupilSize)
+    {
+        if (instance == null || !PhotonNetwork.InRoom)
+        {
+            Debug.LogWarning("AlignmentNetworkHub: Cannot broadcast gaze data");
+            return;
+        }
+
+        instance.photonView.RPC(
+            "ReceiveGazeData",
+            RpcTarget.Others,
+            PhotonNetwork.LocalPlayer.ActorNumber,
+            gazePosition.x, gazePosition.y,
+            pupilSize,
+            true
+        );
+    }
+
+    [PunRPC]
+    void ReceiveFaceLandmarks(int playerId, float[] landmarkData, bool hasData)
+    {
+        if (hasData && landmarkData != null)
+        {
+            // Convert float array back to Vector3 array
+            Vector3[] landmarks = new Vector3[landmarkData.Length / 3];
+            for (int i = 0; i < landmarks.Length; i++)
+            {
+                landmarks[i] = new Vector3(
+                    landmarkData[i * 3],
+                    landmarkData[i * 3 + 1],
+                    landmarkData[i * 3 + 2]
+                );
+            }
+
+            Debug.Log($"<color=green>[AlignmentHub] Received face landmarks from Player {playerId}: {landmarks.Length} points</color>");
+            OnFaceLandmarksReceived?.Invoke(playerId, landmarks, hasData);
+        }
+        else
+        {
+            OnFaceLandmarksReceived?.Invoke(playerId, null, false);
+        }
+    }
+
+    [PunRPC]
+    void ReceiveGazeData(int playerId, float gazeX, float gazeY, float pupilSize, bool hasData)
+    {
+        Vector2 gazePosition = new Vector2(gazeX, gazeY);
+        
+        Debug.Log($"<color=green>[AlignmentHub] Received gaze data from Player {playerId}: {gazePosition}</color>");
+        OnGazeDataReceived?.Invoke(playerId, gazePosition, pupilSize, hasData);
     }
 
     #endregion
