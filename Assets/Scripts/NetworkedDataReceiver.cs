@@ -43,6 +43,14 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
     [Tooltip("Show debug logs for received data")]
     public bool showDebugLogs = true;
     
+    [Header("Mesh Alignment")]
+    [Tooltip("Name of the mesh GameObject to align (will search by name if meshToAlign not assigned)")]
+    public string meshName = "ScannedRoom";
+    [Tooltip("Optional direct reference to the mesh Transform to apply alignment to")]
+    public Transform meshToAlign;
+    [Tooltip("If enabled, log alignment updates")]
+    public bool logAlignment = true;
+    
     private Vector2 gazePosition;
     private float pupilSize;
     private System.Collections.Generic.Dictionary<int, Vector3> faceLandmarks = new System.Collections.Generic.Dictionary<int, Vector3>();
@@ -72,6 +80,36 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
             {
                 Debug.Log($"[NetworkedDataReceiver] Visualization setup complete | IsMine: {photonView.IsMine}");
             }
+        }
+
+        // Resolve meshToAlign by name if not provided
+        if (meshToAlign == null && !string.IsNullOrEmpty(meshName))
+        {
+            GameObject meshObj = GameObject.Find(meshName);
+            if (meshObj != null)
+            {
+                meshToAlign = meshObj.transform;
+                if (showDebugLogs && logAlignment)
+                    Debug.Log($"[NetworkedDataReceiver] Found mesh to align: {meshName}");
+            }
+            else
+            {
+                if (showDebugLogs && logAlignment)
+                    Debug.LogWarning($"[NetworkedDataReceiver] Could not find mesh named '{meshName}' in scene.");
+            }
+        }
+
+        // Register to receive Photon RaiseEvent alignment messages
+        try
+        {
+            PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
+            if (showDebugLogs && logAlignment)
+                Debug.Log("[NetworkedDataReceiver] Subscribed to Photon events for alignment.");
+        }
+        catch (System.Exception ex)
+        {
+            if (showDebugLogs)
+                Debug.LogWarning($"[NetworkedDataReceiver] Could not subscribe to Photon events: {ex.Message}");
         }
     }
     
@@ -310,5 +348,74 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
             if (landmark != null)
                 Destroy(landmark);
         }
+
+        // Unsubscribe Photon event
+        try
+        {
+            PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
+        }
+        catch {}
+    }
+
+    // Photon event handler for custom events (alignment)
+    void OnPhotonEvent(ExitGames.Client.Photon.EventData photonEvent)
+    {
+        const byte alignmentEventCode = 101;
+        if (photonEvent.Code != alignmentEventCode)
+            return;
+
+        object data = photonEvent.CustomData;
+        object[] arr = data as object[];
+        if (arr == null || arr.Length < 10)
+        {
+            if (showDebugLogs && logAlignment)
+                Debug.LogWarning("[NetworkedDataReceiver] Alignment event received with invalid data.");
+            return;
+        }
+
+        // Convert values safely
+        float px = ConvertToFloat(arr[0]);
+        float py = ConvertToFloat(arr[1]);
+        float pz = ConvertToFloat(arr[2]);
+        float rx = ConvertToFloat(arr[3]);
+        float ry = ConvertToFloat(arr[4]);
+        float rz = ConvertToFloat(arr[5]);
+        float rw = ConvertToFloat(arr[6]);
+        float sx = ConvertToFloat(arr[7]);
+        float sy = ConvertToFloat(arr[8]);
+        float sz = ConvertToFloat(arr[9]);
+
+        if (showDebugLogs && logAlignment)
+            Debug.Log($"[NetworkedDataReceiver] Alignment event -> Pos({px:F3},{py:F3},{pz:F3}) Rot({rx:F3},{ry:F3},{rz:F3},{rw:F3}) Scale({sx:F3},{sy:F3},{sz:F3})");
+
+        if (meshToAlign == null && !string.IsNullOrEmpty(meshName))
+        {
+            GameObject meshObj = GameObject.Find(meshName);
+            if (meshObj != null)
+                meshToAlign = meshObj.transform;
+        }
+
+        if (meshToAlign == null)
+        {
+            if (showDebugLogs && logAlignment)
+                Debug.LogWarning("[NetworkedDataReceiver] No meshToAlign to apply alignment.");
+            return;
+        }
+
+        meshToAlign.position = new Vector3(px, py, pz);
+        meshToAlign.rotation = new Quaternion(rx, ry, rz, rw);
+        meshToAlign.localScale = new Vector3(sx, sy, sz);
+        
+        Debug.Log("<color=lime>[NetworkedDataReceiver] ✓ Mesh alignment applied successfully!</color>");
+    }
+
+    static float ConvertToFloat(object o)
+    {
+        if (o is float f) return f;
+        if (o is double d) return (float)d;
+        if (o is int i) return (float)i;
+        if (o is long l) return (float)l;
+        float.TryParse(o?.ToString() ?? "0", out float res);
+        return res;
     }
 }

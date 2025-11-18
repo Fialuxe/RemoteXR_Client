@@ -180,3 +180,6 @@ MonoBehaviour:
   circleColor: {r: 1, g: 0, b: 0, a: 1}
   testTransformsOnly: 1
   showDebugLogs: 1
+  meshName: ScannedRoom
+  meshToAlign: {fileID: 0}
+  logAlignment: 1
