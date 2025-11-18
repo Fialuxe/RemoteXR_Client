@@ -132,6 +132,10 @@ public class RemoteExpertManager : MonoBehaviourPunCallbacks
             foreach (int idx in keyLandmarks)
             {
                 Vector3 landmark = oscReceiver.GetFaceLandmark(idx);
+                //reason for buffering: new clients joining later will get the last known face landmarks
+                // we want to avoid popping so we buffer them
+                // if we do not buffer, new clients will see a neutral face until the next update
+                // so this may be preferable in some cases
                 pv.RPC("ReceiveFaceLandmark", RpcTarget.AllBuffered, idx, landmark.x, landmark.y, landmark.z);
             }
         }
