@@ -1,30 +1,21 @@
 # Usage:
-# python3 lsl_server.py --camera 1 --filter kalman
+# python3 osc_server.py --camera 1 --filter kalman
 #
 # Data Format Specification:
 # --------------------------------------------------------------------------------
-# EyeGaze LSL Stream: [gaze_x_normalized, gaze_y_normalized, blink]
-#   - gaze_x_normalized: Horizontal gaze position, normalized [0.0, 1.0]
-#                        0.0 = left edge of display, 1.0 = right edge of display
-#   - gaze_y_normalized: Vertical gaze position, normalized [0.0, 1.0]
-#                        0.0 = top edge of display, 1.0 = bottom edge of display
-#   - blink: Blink detection flag (0 or 1)
-#            0 = eyes open (normal gaze)
-#            1 = blink detected
+# OSC Message Format (replaces LSL for better reliability):
+#   /gaze x y pupil - Eye gaze data (3 floats)
+#     x: Horizontal gaze position, normalized [0.0, 1.0]
+#     y: Vertical gaze position, normalized [0.0, 1.0]
+#     pupil: Pupil size
 #
-# Transmission Rules:
-#   - If blink detected:        Send (0.0, 0.0, 1.0)
-#   - If eyes open and valid:   Send (x, y, 0.0) where x,y are normalized gaze coords
-#   - If data is invalid:       Do NOT send anything, skip to next frame
-#
-# FaceMesh LSL Stream: [10 key landmark points (x,y,z)]
-#   - Landmarks: nose_tip, right_eye, left_eye, mouth_right, mouth_left, 
-#                chin, forehead, upper_lip, lower_lip, right_cheek
-#   - x, y: normalized [0.0, 1.0]
-#   - z: depth in meters (relative to camera)
+#   /facemesh index x y z - Face mesh landmark data (4 values per landmark)
+#     index: Landmark index [0-67]
+#     x, y: Normalized position [0.0, 1.0]
+#     z: Depth in meters
 # --------------------------------------------------------------------------------
-# This script runs the Eyetrax gaze estimation demo and streams gaze data and MediaPipe FaceMesh data via LSL.
-# --- Imports ---
+# This script runs the Eyetrax gaze estimation demo and streams gaze and MediaPipe FaceMesh data via OSC.
+
 import os
 import time
 try: 
@@ -38,7 +29,7 @@ try:
 except ImportError as e:
     raise SystemExit("mediapipe not installed. Run: pip install mediapipe") from e
 
- # Eyetrax imports
+# Eyetrax imports
 try:
     from eyetrax.calibration import (
         run_5_point_calibration,
@@ -54,31 +45,17 @@ try:
 except ImportError as e:
     raise SystemExit("eyetrax not installed. Run: pip install eyetrax") from e
 
-# LSL imports
+# OSC imports
 try:
-    from pylsl import StreamInfo, StreamOutlet, local_clock
+    from pythonosc import udp_client
 except ImportError as e:
-    raise SystemExit("pylsl not installed. Run: pip install pylsl") from e
+    raise SystemExit("pythonosc not installed. Run: pip install python-osc") from e
 
-# --- EyeGaze LSL Stream Configuration ---
-STREAM_NAME = "EyeGaze"
-STREAM_TYPE = "Gaze"
-CHANNEL_COUNT = 3
-# Use 30.0 for fixed rate; was 0.0 for irregular rate (causing crashes)
-SAMPLE_RATE = 30.0
-CHANNEL_FORMAT = 'float32'
-SOURCE_ID = 'eyetrax_source_001'
-
-# --- MediaPipe FaceMesh LSL Stream Configuration ---
-FACEMESH_STREAM_NAME = "FaceMesh"
-FACEMESH_STREAM_TYPE = "FaceLandmarks"
-FACEMESH_CHANNEL_COUNT = 68 * 3  # 68 landmark points, each with x,y,z
-FACEMESH_SAMPLE_RATE = 30.0
-FACEMESH_CHANNEL_FORMAT = 'float32'
-FACEMESH_SOURCE_ID = 'eyetrax_facemesh_001'
+# --- OSC Configuration ---
+OSC_IP = "127.0.0.1"  # localhost - Unity should be running on same machine
+OSC_PORT = 8000       # Port Unity is listening on
 
 # MediaPipe FaceMesh 68-point landmark mapping
-# Based on facial feature regions for accurate expression tracking
 FACEMESH_68_INDICES = [
     # Jawline (0-16): 17 points
     234, 127, 162, 21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454,
@@ -108,88 +85,186 @@ FACEMESH_68_INDICES = [
     78, 191, 80, 81, 82, 13, 312, 311
 ]
 
-# --- End LSL Configuration ---
-def create_facemesh_lsl_outlet(): 
+def create_osc_client():
     """
-    Creates and returns a new LSL StreamOutlet for MediaPipe FaceMesh data.
-    Sends 68 key landmark points (x, y, z) for avatar expression, normalized to [0,1] (x, y) and z in meters.
-    Based on the standard 68-point facial landmark model.
+    Creates and returns an OSC UDP client for sending data to Unity.
     """
-    info = StreamInfo(
-        FACEMESH_STREAM_NAME,
-        FACEMESH_STREAM_TYPE,
-        FACEMESH_CHANNEL_COUNT,
-        FACEMESH_SAMPLE_RATE,
-        FACEMESH_CHANNEL_FORMAT,
-        FACEMESH_SOURCE_ID,
-    )
-    chns = info.desc().append_child("channels")
-    
-    # Define landmark names based on facial regions
-    landmark_regions = [
-        # Jawline (0-16)
-        *[f"jaw_{i}" for i in range(17)],
-        # Right eyebrow (17-21)
-        *[f"right_brow_{i}" for i in range(5)],
-        # Left eyebrow (22-26)
-        *[f"left_brow_{i}" for i in range(5)],
-        # Nose bridge (27-30)
-        *[f"nose_bridge_{i}" for i in range(4)],
-        # Nose bottom (31-35)
-        *[f"nose_bottom_{i}" for i in range(5)],
-        # Right eye (36-41)
-        *[f"right_eye_{i}" for i in range(6)],
-        # Left eye (42-47)
-        *[f"left_eye_{i}" for i in range(6)],
-        # Outer lip (48-59)
-        *[f"outer_lip_{i}" for i in range(12)],
-        # Inner lip (60-67)
-        *[f"inner_lip_{i}" for i in range(8)]
-    ]
-    
-    for name in landmark_regions:
-        for axis in ["x", "y", "z"]:
-            ch = chns.append_child("channel")
-            ch.append_child_value("label", f"{name}_{axis}")
-    
-    info.desc().append_child_value("description", 
-        "68 MediaPipe FaceMesh landmarks (x,y normalized [0,1], z in meters) - Standard facial landmark model")
-    return StreamOutlet(info, chunk_size=1, max_buffered=360)
+    print(f"Creating OSC client: {OSC_IP}:{OSC_PORT}")
+    return udp_client.SimpleUDPClient(OSC_IP, OSC_PORT)
 
 
-def create_lsl_outlet() -> StreamOutlet:
+def run_demo_with_osc():
     """
-    Creates and returns a new LSL StreamOutlet based on the constants.
+    Runs the Eyetrax demo and streams gaze and face mesh data via OSC.
     """
-    info = StreamInfo(
-        STREAM_NAME,
-        STREAM_TYPE,
-        CHANNEL_COUNT,
-        SAMPLE_RATE,
-        CHANNEL_FORMAT,
-        SOURCE_ID,
-    )
+    args = parse_common_args()
+
+    filter_method = args.filter
+    camera_index = args.camera
+    calibration_method = args.calibration
+    background_path = args.background
+    confidence_level = args.confidence
+
+    gaze_estimator = GazeEstimator(model_name=args.model)
+
+    if args.model_file and os.path.isfile(args.model_file):
+        gaze_estimator.load_model(args.model_file)
+        print(f"[demo] Loaded gaze model from {args.model_file}")
+    else:
+        if calibration_method == "9p":
+            run_9_point_calibration(gaze_estimator, camera_index=camera_index)
+        elif calibration_method == "5p":
+            run_5_point_calibration(gaze_estimator, camera_index=camera_index)
+        else:
+            run_lissajous_calibration(gaze_estimator, camera_index=camera_index)
+
+    screen_width, screen_height = get_screen_size()
+    if screen_width == 0 or screen_height == 0:
+        raise ValueError("Could not get valid screen dimensions.")
     
-    # Add channel labels as metadata
-    chns = info.desc().append_child("channels")
-    for label in ["gaze_x_normalized", "gaze_y_normalized", "blink"]:
-        ch = chns.append_child("channel")
-        ch.append_child_value("label", label)
+    print(f"Screen resolution: {screen_width}x{screen_height}")
 
-    # Add coordinate system metadata (good practice)
-    gaze_desc = info.desc().append_child("gaze_coordinate_system")
-    gaze_desc.append_child_value("convention", "TopLeft")
-    gaze_desc.append_child_value("units", "Normalized")
-    gaze_desc.append_child_value("range_x", "[0.0, 1.0]")
-    gaze_desc.append_child_value("range_y", "[0.0, 1.0]")
-    gaze_desc.append_child_value("blink", "0=eyes_open, 1=blink_detected")
-    
-    print(f"Creating LSL outlet '{STREAM_NAME}' (Type: {STREAM_TYPE})...")
-    # chunk_size=1 means we push one sample at a time
-    return StreamOutlet(info, chunk_size=1, max_buffered=360)
+    if filter_method == "kalman":
+        kalman = make_kalman()
+        smoother = KalmanSmoother(kalman)
+        smoother.tune(gaze_estimator, camera_index=camera_index)
+    elif filter_method == "kde":
+        smoother = KDESmoother(screen_width, screen_height, confidence=confidence_level)
+    else:
+        smoother = NoSmoother()
+
+    if background_path and os.path.isfile(background_path):
+        background = cv2.imread(background_path)
+        background = cv2.resize(background, (screen_width, screen_height))
+    else:
+        background = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
+        background[:] = (50, 50, 50)
+
+    # Create OSC client
+    try:
+        osc_client = create_osc_client()
+        print("OSC client created successfully!")
+    except Exception as e:
+        print(f"Error creating OSC client: {e}")
+        return
+
+    mp_face_mesh = mp.solutions.face_mesh
+    with camera(camera_index) as cap, mp_face_mesh.FaceMesh(
+        static_image_mode=False, 
+        max_num_faces=1, 
+        refine_landmarks=True, 
+        min_detection_confidence=0.5, 
+        min_tracking_confidence=0.5
+    ) as face_mesh:
+        
+        last_print_time = time.time()
+        frame_count = 0
+        gaze_status = "N/A"
+        face_status = "N/A"
+        
+        # Frame rate control
+        target_fps = 30.0
+        frame_interval = 1.0 / target_fps
+        last_send_time = 0.0
+
+        for frame in iter_frames(cap):
+            frame_count += 1
+            current_time = time.time()
+            
+            # Rate limiting
+            if current_time - last_send_time < frame_interval:
+                continue
+            last_send_time = current_time
+            
+            features, blink_detected = gaze_estimator.extract_features(frame)
+
+            # === GAZE PROCESSING ===
+            try:
+                if blink_detected:
+                    osc_client.send_message("/gaze", [0.0, 0.0, 1.0])
+                    gaze_status = "BLINK"
+                elif features is not None:
+                    gaze_point = gaze_estimator.predict(np.array([features]))[0]
+                    x, y = map(int, gaze_point)
+                    
+                    if np.isfinite(x) and np.isfinite(y) and abs(x) < 100000 and abs(y) < 100000:
+                        x_pred, y_pred = smoother.step(x, y)
+                        
+                        if x_pred is not None and y_pred is not None:
+                            gaze_x = np.clip(x_pred / screen_width, 0.0, 1.0)
+                            gaze_y = np.clip(y_pred / screen_height, 0.0, 1.0)
+                            
+                            osc_client.send_message("/gaze", [float(gaze_x), float(gaze_y), 0.0])
+                            gaze_status = f"({gaze_x:.2f}, {gaze_y:.2f})"
+                        else:
+                            gaze_status = "INVALID"
+                    else:
+                        gaze_status = "OUT_OF_RANGE"
+                else:
+                    gaze_status = "NO_FEATURES"
+            except Exception as e:
+                gaze_status = f"ERROR: {e}"
+
+            # === FACEMESH PROCESSING ===
+            try:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = face_mesh.process(rgb_frame)
+                
+                if results.multi_face_landmarks:
+                    face_landmarks = results.multi_face_landmarks[0]
+                    sent_count = 0
+                    
+                    for i, idx in enumerate(FACEMESH_68_INDICES):
+                        lm = face_landmarks.landmark[idx]
+                        
+                        if np.isfinite(lm.x) and np.isfinite(lm.y) and np.isfinite(lm.z):
+                            x = np.clip(lm.x, 0.0, 1.0)
+                            y = np.clip(lm.y, 0.0, 1.0)
+                            z = np.clip(lm.z, -1.0, 1.0)
+                            
+                            osc_client.send_message("/facemesh", [float(i), float(x), float(y), float(z)])
+                            sent_count += 1
+                    
+                    face_status = f"{sent_count}/68"
+                else:
+                    face_status = "NO_FACE"
+            except Exception as e:
+                face_status = f"ERROR: {e}"
+
+            # Status print
+            if current_time - last_print_time >= 1.0:
+                fps = frame_count / (current_time - last_print_time)
+                print(f"\r[FPS: {fps:.1f}] Gaze: {gaze_status} | Face: {face_status}          ", end="", flush=True)
+                last_print_time = current_time
+                frame_count = 0
+
+            # Simple visualization
+            canvas = np.ones((400, 320, 3), dtype=np.uint8) * 30
+            cv2.rectangle(canvas, (40, 40), (280, 200), (100, 255, 100), 2)
+            
+            if gaze_status.startswith("("):
+                try:
+                    coords = gaze_status.strip("()").split(", ")
+                    gx = int(40 + float(coords[0]) * 240)
+                    gy = int(40 + float(coords[1]) * 160)
+                    cv2.circle(canvas, (gx, gy), 8, (0, 255, 255), -1)
+                except:
+                    pass
+            
+            cv2.putText(canvas, f"Gaze: {gaze_status}", (10, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(canvas, f"Face: {face_status}", (10, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(canvas, "Press ESC to exit", (10, 320), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+            
+            cv2.imshow("OSC Gaze/Face Streamer", canvas)
+            if cv2.waitKey(1) == 27:
+                print("\nESC pressed. Stopping...")
+                break
+        
+        print("\nDemo finished.")
 
 
-def run_demo_with_lsl():
+if __name__ == "__main__":
+    run_demo_with_osc()
     """
     Runs the Eyetrax demo and streams gaze data via LSL.
     """

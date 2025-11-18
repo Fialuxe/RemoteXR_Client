@@ -2,4 +2,4 @@ opencv-python
 numpy
 mediapipe
 eyetrax
-pylsl
+python-osc
