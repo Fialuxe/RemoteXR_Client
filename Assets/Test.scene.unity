@@ -119,57 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &936026
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 936028}
-  - component: {fileID: 936027}
-  m_Layer: 0
-  m_Name: RemoteClient
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &936027
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 936026}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a89bfa4075fe3d34d813ae8ee3017d03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RemoteClient
-  isTransmitter: 1
-  moveSpeed: 5
-  fastMultiplier: 3
-  slowMultiplier: 0.3
-  lookSensitivity: 2
-  requireRightMouseToLook: 1
-  lockCursorWhenLooking: 1
---- !u!4 &936028
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 936026}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97224, y: 0, z: 15.03451}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &195621590
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -225,7 +174,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7059152900096708746, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 491770476}
   m_SourcePrefab: {fileID: -4161369568681901532, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
 --- !u!4 &195621591 stripped
 Transform:
@@ -359,123 +311,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
---- !u!1 &465332683
+--- !u!1 &491770473 stripped
 GameObject:
+  m_CorrespondingSourceObject: {fileID: -7059152900096708746, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
+  m_PrefabInstance: {fileID: 195621590}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &491770476
+MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 465332686}
-  - component: {fileID: 465332685}
-  - component: {fileID: 465332684}
-  m_Layer: 0
-  m_Name: AlignmentNetworkHub
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &465332684
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 465332683}
+  m_GameObject: {fileID: 491770473}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
   m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa584fbee541324448dd18d8409c7a41, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PhotonUnityNetworking::Photon.Pun.PhotonView
-  ObservedComponentsFoldoutOpen: 1
-  Group: 0
-  prefixField: -1
-  Synchronization: 3
-  OwnershipTransfer: 0
-  observableSearch: 2
-  ObservedComponents: []
-  sceneViewId: 1
-  InstantiationId: 0
-  isRuntimeInstantiated: 0
---- !u!114 &465332685
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 465332683}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca2f0cf3db97d46eaa54f4c8bdc6d44a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AlignmentNetworkHub
---- !u!4 &465332686
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 465332683}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97225, y: 0, z: 15.03453}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &859226469
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 859226471}
-  - component: {fileID: 859226470}
-  m_Layer: 0
-  m_Name: LocationCalibrationTool
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &859226470
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 859226469}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f81f297ae286f44489b44db5f64bf694, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AlignmentCalibrationTool
-  scannedMesh: {fileID: 195621591}
-  alignmentManager: {fileID: 1638703690}
-  calibrationMarkers: []
-  enableKeyboardAdjustment: 1
-  adjustmentStep: 0.1
-  rotationStep: 5
---- !u!4 &859226471
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 859226469}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97224, y: 0, z: 15.03451}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -8208244941744126863, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
 --- !u!1 &961739749
 GameObject:
   m_ObjectHideFlags: 0
@@ -613,7 +475,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1123050946
+--- !u!1 &1468064926
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -621,174 +483,83 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1123050949}
-  - component: {fileID: 1123050948}
-  - component: {fileID: 1123050947}
+  - component: {fileID: 1468064930}
+  - component: {fileID: 1468064929}
+  - component: {fileID: 1468064928}
+  - component: {fileID: 1468064927}
   m_Layer: 0
-  m_Name: LSLManager
+  m_Name: SceneManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1123050947
+--- !u!114 &1468064927
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1123050946}
+  m_GameObject: {fileID: 1468064926}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49ba4953098665c45a37ac24fa93e920, type: 3}
+  m_Script: {fileID: 11500000, guid: c893e0c2543765144b6c82e966856db2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LslGazeReceiver
-  streamName: EyeGaze
-  streamType: Gaze
-  channelCount: 3
-  resolveTimeout: 2
-  pullTimeout: 0
-  logEveryFrame: 1
-  logInterval: 0.5
---- !u!114 &1123050948
+  m_EditorClassIdentifier: Assembly-CSharp::RemoteExpertManager
+  oscReceiver: {fileID: 1468064928}
+  moveSpeed: 5
+  fastMultiplier: 3
+  slowMultiplier: 0.3
+  lookSensitivity: 2
+  requireRightMouseToLook: 1
+  lockCursorWhenLooking: 1
+  transmissionInterval: 2
+--- !u!114 &1468064928
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1123050946}
+  m_GameObject: {fileID: 1468064926}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 47f3738ec5046b14b8ec0416db8e7343, type: 3}
+  m_Script: {fileID: 11500000, guid: 83e90d96d5f54394491f2c233e22e7c5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LslFaceMeshReceiver
-  streamName: FaceMesh
-  streamType: FaceLandmarks
-  channelCount: 204
-  resolveTimeout: 2
-  pullTimeout: 0
-  logEveryFrame: 0
-  logInterval: 5
---- !u!4 &1123050949
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1123050946}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97224, y: 0, z: 15.03451}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1473122214
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1473122216}
-  - component: {fileID: 1473122215}
-  m_Layer: 0
-  m_Name: MeshAlignmentManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1473122215
+  m_EditorClassIdentifier: Assembly-CSharp::OscDataReceiver
+  receivePort: 8000
+  useFakeData: 0
+  fakeDataRate: 30
+  showDebugInfo: 0
+--- !u!114 &1468064929
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1473122214}
-  m_Enabled: 1
+  m_GameObject: {fileID: 1468064926}
+  m_Enabled: 0
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 54b51f1b95a393747a878c7217adc269, type: 3}
+  m_Script: {fileID: 11500000, guid: 12ddfca529b71fc43aed1a79ab6108b5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MeshAlignmentTool
-  scannedMesh: {fileID: 195621591}
-  alignmentMode: 0
-  startInAlignmentMode: 1
+  m_EditorClassIdentifier: Assembly-CSharp::MeshAlignmentManager
+  meshToAlign: {fileID: 195621591}
+  alignmentModeEnabled: 0
+  toggleAlignmentKey: 109
   moveSpeed: 0.5
   rotateSpeed: 30
   scaleSpeed: 0.1
   fineAdjustMultiplier: 0.1
-  useVRControllers: 1
-  useKeyboard: 1
-  alignmentMaterial: {fileID: 0}
-  alignmentColor: {r: 0, g: 1, b: 0, a: 0.3}
-  showGrid: 1
-  gridPrefab: {fileID: 0}
-  autoSaveOnExit: 1
   saveKey: MeshAlignment_
---- !u!4 &1473122216
+--- !u!4 &1468064930
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1473122214}
+  m_GameObject: {fileID: 1468064926}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97224, y: 0, z: 15.03451}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1638703689
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1638703691}
-  - component: {fileID: 1638703690}
-  m_Layer: 0
-  m_Name: UserSaptialAlignmentManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1638703690
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1638703689}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a77d605bdac00174582dd022a02464a5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SpatialAlignmentManager
-  meshReferencePoint: {fileID: 0}
-  alignmentMode: 0
-  positionOffset: {x: 0, y: 0, z: 0}
-  rotationOffset: {x: 0, y: 0, z: 0}
-  scaleMultiplier: 1
-  showDebugInfo: 1
-  alignmentMarkerPrefab: {fileID: 0}
---- !u!4 &1638703691
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1638703689}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.97224, y: 0, z: 15.03451}
+  m_LocalPosition: {x: 0.81396, y: 0, z: 2.41778}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -800,10 +571,5 @@ SceneRoots:
   m_Roots:
   - {fileID: 961739753}
   - {fileID: 203844589}
-  - {fileID: 465332686}
-  - {fileID: 1473122216}
   - {fileID: 195621590}
-  - {fileID: 1123050949}
-  - {fileID: 1638703691}
-  - {fileID: 859226471}
-  - {fileID: 936028}
+  - {fileID: 1468064930}

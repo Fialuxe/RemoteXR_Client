@@ -38,10 +38,10 @@ MonoBehaviour:
   - DestroyRpc
   - DestroySpaceship
   - Fire
+  - ReceiveAlignment
+  - ReceiveFaceLandmark
+  - ReceiveGazeData
   - RespawnSpaceship
-  - ReceiveAlignmentData
-  - OnAlignmentModeChanged
-  - ReceiveMeshAlignment
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1
