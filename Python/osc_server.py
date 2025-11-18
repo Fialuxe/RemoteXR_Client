@@ -3,7 +3,7 @@
 #
 # Data Format Specification:
 # --------------------------------------------------------------------------------
-# OSC Message Format (replaces LSL for better reliability):
+# OSC Message Format (replaces osc for better reliability):
 #   /gaze x y pupil - Eye gaze data (3 floats)
 #     x: Horizontal gaze position, normalized [0.0, 1.0]
 #     y: Vertical gaze position, normalized [0.0, 1.0]
@@ -181,7 +181,9 @@ def run_demo_with_osc():
             # === GAZE PROCESSING ===
             try:
                 if blink_detected:
-                    osc_client.send_message("/gaze", [0.0, 0.0, 1.0])
+                    gaze_x = np.clip(x_pred / screen_width, 0.0, 1.0)
+                    gaze_y = np.clip(y_pred / screen_height, 0.0, 1.0)
+                    osc_client.send_message("/gaze", [float(gaze_x), float(gaze_y), 1.0])
                     gaze_status = "BLINK"
                 elif features is not None:
                     gaze_point = gaze_estimator.predict(np.array([features]))[0]
@@ -266,7 +268,7 @@ def run_demo_with_osc():
 if __name__ == "__main__":
     run_demo_with_osc()
     """
-    Runs the Eyetrax demo and streams gaze data via LSL.
+    Runs the Eyetrax demo and streams gaze data via osc.
     """
     args = parse_common_args()
 
@@ -324,23 +326,23 @@ if __name__ == "__main__":
     cursor_step = 0.05
 
 
-    # --- Create the LSL Outlets ---
+    # --- Create the osc Outlets ---
     try:
-        outlet = create_lsl_outlet()
-        print("LSL Outlet created. Streaming gaze data...")
+        outlet = create_osc_outlet()
+        print("osc Outlet created. Streaming gaze data...")
     except Exception as e:
-        print(f"Error creating LSL outlet: {e}")
-        print("Continuing without LSL streaming.")
+        print(f"Error creating osc outlet: {e}")
+        print("Continuing without osc streaming.")
         outlet = None
 
     try:
-        facemesh_outlet = create_facemesh_lsl_outlet()
-        print("FaceMesh LSL Outlet created. Streaming face mesh data...")
+        facemesh_outlet = create_facemesh_osc_outlet()
+        print("FaceMesh osc Outlet created. Streaming face mesh data...")
     except Exception as e:
-        print(f"Error creating FaceMesh LSL outlet: {e}")
-        print("Continuing without FaceMesh LSL streaming.")
+        print(f"Error creating FaceMesh osc outlet: {e}")
+        print("Continuing without FaceMesh osc streaming.")
         facemesh_outlet = None
-    # --- End LSL Setup ---
+    # --- End osc Setup ---
 
 
 
@@ -361,7 +363,7 @@ if __name__ == "__main__":
         for frame in iter_frames(cap):
             frame_count += 1
             features, blink_detected = gaze_estimator.extract_features(frame)
-            lsl_sample = None  # Will be set based on blink/gaze state
+            osc_sample = None  # Will be set based on blink/gaze state
 
             # --- FaceMesh processing ---
             facemesh_sample = [np.nan] * FACEMESH_CHANNEL_COUNT
@@ -384,11 +386,13 @@ if __name__ == "__main__":
                     facemesh_sample[i*3+1] = max(0.0, min(1.0, lm.y))  # clamp to [0,1]
                     facemesh_sample[i*3+2] = max(-1.0, min(1.0, lm.z))  # clamp z to reasonable range
 
-            # --- Gaze estimation and LSL sample preparation ---
+            # --- Gaze estimation and osc sample preparation ---
             # Case 1: Blink detected -> send (0, 0, 1)
+            # 18112025 fix to send previous data when blink detected
+            # it prevents sudden jumps after blink
             if blink_detected:
-                lsl_sample = [0.0, 0.0, 1.0]
-                x_pred = y_pred = None
+                osc_sample = [osc_gaze_x, osc_gaze_y, 1.0]
+                x_pred, y_pred = smoother.step(x, y)
                 contours = []
                 cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
             # Case 2: Valid features and no blink -> send (x, y, 0)
@@ -399,13 +403,13 @@ if __name__ == "__main__":
                 # Validate raw predictions before smoothing
                 if not (np.isfinite(x) and np.isfinite(y)):
                     print(f"\nWARNING: Gaze estimator returned non-finite values: ({x}, {y}). Skipping.")
-                    lsl_sample = None
+                    osc_sample = None
                     x_pred = y_pred = None
                     contours = []
                     cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
                 elif abs(x) > 100000 or abs(y) > 100000:
                     print(f"\nWARNING: Gaze estimator returned extreme values: ({x}, {y}). Skipping.")
-                    lsl_sample = None
+                    osc_sample = None
                     x_pred = y_pred = None
                     contours = []
                     cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
@@ -418,60 +422,60 @@ if __name__ == "__main__":
                     # Add safety checks for division by zero and invalid values
                     if screen_width <= 0 or screen_height <= 0:
                         print(f"\nWARNING: Invalid screen dimensions ({screen_width}x{screen_height}). Skipping frame.")
-                        lsl_sample = None
+                        osc_sample = None
                     elif x_pred is None or y_pred is None or not np.isfinite(x_pred) or not np.isfinite(y_pred):
                         print(f"\nWARNING: Invalid predicted gaze ({x_pred}, {y_pred}). Skipping frame.")
-                        lsl_sample = None
+                        osc_sample = None
                     else:
-                        lsl_gaze_x = x_pred / screen_width
-                        lsl_gaze_y = y_pred / screen_height
+                        osc_gaze_x = x_pred / screen_width
+                        osc_gaze_y = y_pred / screen_height
                         
                         # Additional safety check after division
-                        if not np.isfinite(lsl_gaze_x) or not np.isfinite(lsl_gaze_y):
-                            print(f"\nWARNING: Division resulted in invalid values ({lsl_gaze_x}, {lsl_gaze_y}). Skipping frame.")
-                            lsl_sample = None
+                        if not np.isfinite(osc_gaze_x) or not np.isfinite(osc_gaze_y):
+                            print(f"\nWARNING: Division resulted in invalid values ({osc_gaze_x}, {osc_gaze_y}). Skipping frame.")
+                            osc_sample = None
                         else:
                             # Clamp to valid range
-                            lsl_gaze_x = max(0.0, min(1.0, lsl_gaze_x))
-                            lsl_gaze_y = max(0.0, min(1.0, lsl_gaze_y))
-                            lsl_sample = [lsl_gaze_x, lsl_gaze_y, 0.0]
+                            osc_gaze_x = max(0.0, min(1.0, osc_gaze_x))
+                            osc_gaze_y = max(0.0, min(1.0, osc_gaze_y))
+                            osc_sample = [osc_gaze_x, osc_gaze_y, 0.0]
             # Case 3: Invalid data (features is None and no blink) -> don't send
             else:
-                lsl_sample = None
+                osc_sample = None
                 x_pred = y_pred = None
                 contours = []
                 cursor_alpha = max(cursor_alpha - cursor_step, 0.0)
 
-            # --- Push samples to LSL ---
+            # --- Push samples to osc ---
             # CRITICAL: Only send valid data to prevent prediction errors/freezes on receiver side
             # Apply 30fps rate limiting for both gaze and facemesh
             current_time = time.time()
             
             if outlet:
                 try:
-                    if lsl_sample is not None:
+                    if osc_sample is not None:
                         # FINAL VALIDATION: Absolutely ensure no invalid values are sent
                         all_values_valid = True
-                        for val in lsl_sample:
+                        for val in osc_sample:
                             if not isinstance(val, (int, float)) or not np.isfinite(val) or abs(val) > 10.0:
                                 all_values_valid = False
-                                print(f"\nCRITICAL: Blocked invalid gaze sample from being sent: {lsl_sample}")
+                                print(f"\nCRITICAL: Blocked invalid gaze sample from being sent: {osc_sample}")
                                 break
                         
                         if all_values_valid:
                             # Double-check range [0, 1] for x and y
-                            if not (0.0 <= lsl_sample[0] <= 1.0 and 0.0 <= lsl_sample[1] <= 1.0):
-                                print(f"\nCRITICAL: Gaze values out of range [0,1]: {lsl_sample}. Not sending.")
+                            if not (0.0 <= osc_sample[0] <= 1.0 and 0.0 <= osc_sample[1] <= 1.0):
+                                print(f"\nCRITICAL: Gaze values out of range [0,1]: {osc_sample}. Not sending.")
                             else:
                                 # Apply 30fps rate limiting
                                 if current_time - last_gaze_send_time >= frame_interval:
                                     # Send valid data: either (x, y, 0) or (0, 0, 1)
-                                    outlet.push_sample(lsl_sample, local_clock())
+                                    outlet.push_sample(osc_sample, local_clock())
                                     last_gaze_send_time = current_time
-                                    if lsl_sample[2] == 1.0:
-                                        gaze_data_str = "Gaze: BLINK (0,0,1)"
+                                    if osc_sample[2] == 1.0:
+                                        gaze_data_str = f"Gaze: BLINK ({osc_sample[0]:.3f},{osc_sample[1]:.3f},1)"
                                     else:
-                                        gaze_data_str = f"Gaze: x={lsl_sample[0]:.3f} y={lsl_sample[1]:.3f} (blink=0)"
+                                        gaze_data_str = f"Gaze: x={osc_sample[0]:.3f} y={osc_sample[1]:.3f} (blink=0)"
                                 else:
                                     gaze_data_str = "Gaze: SKIPPED (rate limit)"
                         else:
@@ -533,10 +537,10 @@ if __name__ == "__main__":
             # Draw normalized gaze area (rectangle)
             gaze_rect = (40, 40, 240, 160)  # x, y, w, h
             cv2.rectangle(canvas, (gaze_rect[0], gaze_rect[1]), (gaze_rect[0]+gaze_rect[2], gaze_rect[1]+gaze_rect[3]), (100,255,100), 2)
-            # Draw gaze point if valid (not blinking and not invalid)
-            if lsl_sample is not None and lsl_sample[2] == 0.0:
-                gx = int(gaze_rect[0] + lsl_sample[0] * gaze_rect[2])
-                gy = int(gaze_rect[1] + lsl_sample[1] * gaze_rect[3])
+            # Draw gaze point if valid (not invalid)
+            if osc_sample is not None:
+                gx = int(gaze_rect[0] + osc_sample[0] * gaze_rect[2])
+                gy = int(gaze_rect[1] + osc_sample[1] * gaze_rect[3])
                 cv2.circle(canvas, (gx, gy), 8, (0,255,255), -1)
             # Draw improved face representation below
             face_origin = (160, 270)
@@ -576,4 +580,4 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
-    run_demo_with_lsl()
+    run_demo_with_osc()
