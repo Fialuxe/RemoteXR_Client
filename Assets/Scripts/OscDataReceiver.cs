@@ -281,7 +281,19 @@ public class OscDataReceiver : MonoBehaviour
     
     public Vector3[] GetAllFaceLandmarks() => faceLandmarks;
 
+// Cleanup on destroy
     void OnDestroy()
+    {
+        isRunning = false;
+        if (udpClient != null)
+        {
+            udpClient.Close();
+            udpClient = null;
+        }
+    }
+
+        //on exit, close the UDP client
+    void OnApplicationQuit()
     {
         isRunning = false;
         if (udpClient != null)
