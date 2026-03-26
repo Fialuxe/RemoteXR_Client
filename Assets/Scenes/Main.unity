@@ -174,7 +174,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -7059152900096708746, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1773174629}
   m_SourcePrefab: {fileID: -4161369568681901532, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
 --- !u!1 &330585543
 GameObject:
@@ -515,15 +518,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 936269055}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a89bfa4075fe3d34d813ae8ee3017d03, type: 3}
+  m_Script: {fileID: 11500000, guid: 6a3af7bbed810bb488c07d0b1e04d094, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RemoteClient
+  oscReceiver: {fileID: 0}
   moveSpeed: 5
   fastMultiplier: 3
   slowMultiplier: 0.3
   lookSensitivity: 2
   requireRightMouseToLook: 1
   lockCursorWhenLooking: 1
+  transmissionInterval: 2
 --- !u!4 &936269057
 Transform:
   m_ObjectHideFlags: 0
@@ -645,16 +650,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 1167339786}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a77d605bdac00174582dd022a02464a5, type: 3}
+  m_Script: {fileID: 11500000, guid: 121b571413630b746bc92123bbe3e290, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpatialAlignmentManager
-  meshReferencePoint: {fileID: 1316909098}
-  alignmentMode: 0
-  positionOffset: {x: 0, y: 0, z: 0}
-  rotationOffset: {x: 0, y: 0, z: 0}
-  scaleMultiplier: 1
-  showDebugInfo: 0
-  alignmentMarkerPrefab: {fileID: 0}
+  meshToAlign: {fileID: 0}
+  alignmentModeEnabled: 0
+  controllerNode: 5
+  vrAdjustSpeed: 1
+  gripThreshold: 0.5
+  moveSpeed: 0.5
+  rotateSpeed: 30
+  scaleSpeed: 0.1
+  saveKey: MeshAlignment_
+  autoLoadAlignment: 0
+  persistToPlayerPrefs: 0
+  broadcastRealtime: 0
+  broadcastInterval: 0.1
+  positionThreshold: 0.001
+  rotationThreshold: 0.5
 --- !u!114 &1167339788
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -692,11 +705,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!4 &1316909098 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -4419870469004789900, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
-  m_PrefabInstance: {fileID: 32760724}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1506128238
 GameObject:
   m_ObjectHideFlags: 0
@@ -749,21 +757,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54b51f1b95a393747a878c7217adc269, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MeshAlignmentTool
-  scannedMesh: {fileID: 1316909098}
-  alignmentMode: 0
-  startInAlignmentMode: 1
-  moveSpeed: 0.5
-  rotateSpeed: 30
-  scaleSpeed: 0.1
-  fineAdjustMultiplier: 0.1
-  useVRControllers: 1
-  useKeyboard: 1
-  alignmentMaterial: {fileID: 0}
-  alignmentColor: {r: 0, g: 1, b: 0, a: 0.3}
-  showGrid: 1
-  gridPrefab: {fileID: 0}
-  autoSaveOnExit: 1
-  saveKey: MeshAlignment_
 --- !u!4 &1506128241
 Transform:
   m_ObjectHideFlags: 0
@@ -808,12 +801,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f81f297ae286f44489b44db5f64bf694, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AlignmentCalibrationTool
-  scannedMesh: {fileID: 1316909098}
-  alignmentManager: {fileID: 1167339787}
-  calibrationMarkers: []
-  enableKeyboardAdjustment: 1
-  adjustmentStep: 0.1
-  rotationStep: 5
 --- !u!4 &1753723786
 Transform:
   m_ObjectHideFlags: 0
@@ -829,6 +816,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1773174626 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -7059152900096708746, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
+  m_PrefabInstance: {fileID: 32760724}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &1773174629
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1773174626}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -8208244941744126863, guid: 903dd053bd0284156b6ea2ff0cc1d9e1, type: 3}
 --- !u!1 &1965130484 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1552418032959293430, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
@@ -846,43 +860,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7c33c0da2e009740b5fe56ce9f83066, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Map2DGazeToMesh
-  lineRenderer: {fileID: 0}
-  cameraTransform: {fileID: 330585546}
-  gazeDistance: 10
-  lineStartOffset: 0.3
-  lineWidth: 0.02
-  lineStartColor: {r: 1, g: 0, b: 0, a: 1}
-  lineEndColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  showDebugInfo: 1
-  enableSimulation: 0
-  simulationSpeed: 0.5
---- !u!114 &1965130496 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 8944714163597623145, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
-  m_PrefabInstance: {fileID: 988790548}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1965130484}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49ba4953098665c45a37ac24fa93e920, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LslGazeReceiver
---- !u!114 &1965130497 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6302654517782935371, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
-  m_PrefabInstance: {fileID: 988790548}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1965130484}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 47f3738ec5046b14b8ec0416db8e7343, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LslFaceMeshReceiver
---- !u!4 &1965130498 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 5320419005657039507, guid: 23fdf403341ffac409ca57a64e4dbaed, type: 3}
-  m_PrefabInstance: {fileID: 988790548}
-  m_PrefabAsset: {fileID: 0}
 --- !u!114 &1965130499
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -895,14 +872,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2ce79193506ba8498109bd0b855042a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhotonFaceGazeTransmitter
-  faceMeshReceiver: {fileID: 1965130497}
-  gazeReceiver: {fileID: 1965130496}
-  transmissionInterval: 1
-  transmitFaceMesh: 1
-  transmitGaze: 1
-  keyLandmarksCount: 20
-  compressLandmarks: 1
-  showDebugLogs: 0
 --- !u!114 &1965130500
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -921,8 +890,7 @@ MonoBehaviour:
   Synchronization: 3
   OwnershipTransfer: 0
   observableSearch: 2
-  ObservedComponents:
-  - {fileID: 1965130498}
+  ObservedComponents: []
   sceneViewId: 4
   InstantiationId: 0
   isRuntimeInstantiated: 0

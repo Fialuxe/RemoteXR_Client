@@ -162,24 +162,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 2262073498233427798}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1b54ff0b8a3877b46a0db5573516d6f7, type: 3}
+  m_Script: {fileID: 11500000, guid: 204c6f7792a06e446995821009e08aa3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkedDataReceiver
-  visualizationMode: 1
+  visualizationMode: 2
   faceLandmarkPrefab: {fileID: 0}
   landmarkScale: 10
   lineRendererMaterial: {fileID: 0}
   lineWidth: 0.01
   lineColor: {r: 0, g: 1, b: 1, a: 1}
-  frustumMaterial: {fileID: 2100000, guid: 293821f8026c5974ebec22dc7f7f2bf1, type: 2}
+  frustumMaterial: {fileID: 0}
   frustumLength: 2
   frustumAngle: 5
   frustumColor: {r: 0, g: 1, b: 1, a: 0.3}
-  circleMaterial: {fileID: 2100000, guid: 1b9ed0d4ea5e6a84ba1530550d84792c, type: 2}
-  circleRadius: 0.4
-  circleColor: {r: 1, g: 0, b: 0, a: 1}
+  circleMaterial: {fileID: 0}
+  circleRadius: 0.5
+  circleColor: {r: 0, g: 1, b: 0.04940009, a: 1}
   testTransformsOnly: 0
-  showDebugLogs: 0
+  showDebugLogs: 1
   meshName: ScannedRoom
   meshToAlign: {fileID: 0}
   logAlignment: 1

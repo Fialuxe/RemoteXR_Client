@@ -23,7 +23,7 @@ set PYTHONWARNINGS=ignore:SymbolDatabase.GetPrototype() is deprecated
 
 :: 6. Run the script
 :: Change --camera 0 to --camera 1 if it does not work with your default camera(like OBS virtual camera)
-echo Starting LSL Server...
+echo Starting OSC Server...
 python osc_server.py --camera 0 --filter kalman
 
 :: Pause so you can see errors if the script crashes immediately

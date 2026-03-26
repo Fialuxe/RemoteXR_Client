@@ -120,12 +120,20 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
         GameObject lineObj = new GameObject("GazeLineRenderer");
         lineObj.transform.parent = transform;
         gazeLineRenderer = lineObj.AddComponent<LineRenderer>();
-        gazeLineRenderer.startWidth = lineWidth;
-        gazeLineRenderer.endWidth = lineWidth;
+        gazeLineRenderer.startWidth = lineWidth * 0.25f; // Tapered start (Half thickness)
+        gazeLineRenderer.endWidth = lineWidth * 1.0f;    // Thicker end (Half thickness)
         gazeLineRenderer.positionCount = 2;
         gazeLineRenderer.material = lineRendererMaterial != null ? lineRendererMaterial : new Material(Shader.Find("Sprites/Default"));
-        gazeLineRenderer.startColor = lineColor;
-        gazeLineRenderer.endColor = lineColor;
+        
+        // Gradient: Transparent at start (eye) -> Solid at end (target)
+        // This prevents the line from blocking the view immediately
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new GradientColorKey[] { new GradientColorKey(lineColor, 0.0f), new GradientColorKey(lineColor, 1.0f) },
+            new GradientAlphaKey[] { new GradientAlphaKey(0.2f, 0.0f), new GradientAlphaKey(1.0f, 1.0f) }
+        );
+        gazeLineRenderer.colorGradient = gradient;
+        
         gazeLineRenderer.enabled = false;
         
         // Setup Frustum
@@ -143,7 +151,30 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
         if (circleMaterial != null)
             circleRenderer.material = circleMaterial;
         else
-            circleRenderer.material.color = circleColor;
+        {
+            // Try to find a suitable shader (URP or Built-in)
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Standard");
+            
+            Material mat = new Material(shader);
+            mat.color = circleColor;
+            
+            // Setup transparency (URP & Standard)
+            mat.SetFloat("_Mode", 3); // Transparent
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            
+            mat.SetFloat("_Surface", 1); // URP Transparent
+            mat.SetFloat("_Blend", 0);   // URP Alpha
+            mat.SetColor("_BaseColor", circleColor); // URP BaseColor
+
+            circleRenderer.material = mat;
+        }
         
         // Remove collider from circle
         if (gazeCircle.GetComponent<Collider>())
@@ -198,15 +229,28 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
             meshRenderer.material = frustumMaterial;
         else
         {
-            Material mat = new Material(Shader.Find("Standard"));
+            // Try to find a suitable shader (URP or Built-in)
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Standard");
+            
+            Material mat = new Material(shader);
             mat.color = frustumColor;
-            mat.SetFloat("_Mode", 3); // Transparent
+            
+            // Setup transparency
+            mat.SetFloat("_Mode", 3); // Transparent for Standard
             mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
             mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             mat.SetInt("_ZWrite", 0);
             mat.DisableKeyword("_ALPHATEST_ON");
             mat.EnableKeyword("_ALPHABLEND_ON");
             mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            
+            // URP specific transparency properties
+            mat.SetFloat("_Surface", 1); // 1 = Transparent
+            mat.SetFloat("_Blend", 0);   // 0 = Alpha
+            mat.SetColor("_BaseColor", frustumColor); // URP uses _BaseColor instead of _Color often
+
             mat.renderQueue = 3000;
             meshRenderer.material = mat;
         }
@@ -272,7 +316,17 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
         if (gazeFrustum != null) gazeFrustum.SetActive(false);
         if (gazeCircle != null) gazeCircle.SetActive(false);
         
-        bool hitSurface = Physics.Raycast(ray, out RaycastHit hit, 10f);
+        // Raycast logic: Increased range to 100m (was 10m)
+        bool hitSurface = Physics.Raycast(ray, out RaycastHit hit, 100f);
+        
+        if (showDebugLogs && visualizationMode == GazeVisualizationMode.SurfaceCircle)
+        {
+             if (hitSurface)
+                 Debug.Log($"[GazeViz] Hit surface: {hit.collider.name} at dist {hit.distance:F1}m");
+             else
+                 Debug.Log("[GazeViz] Raycast MISS (No collider found within 100m)");
+        }
+
         Vector3 gazeEndPoint = hitSurface ? hit.point : ray.origin + ray.direction * 5f;
         
         switch (visualizationMode)
@@ -280,7 +334,11 @@ public class NetworkedDataReceiver : MonoBehaviourPunCallbacks
             case GazeVisualizationMode.LineRenderer:
                 if (gazeLineRenderer != null)
                 {
-                    gazeLineRenderer.SetPosition(0, gazeOrigin);
+                    // Slight vertical offset (2cm down) so the line is visible from first-person view
+                    // (Otherwise it's perfectly collinear and invisible)
+                    Vector3 offsetOrigin = gazeOrigin - (transform.up * 0.005f);
+                    
+                    gazeLineRenderer.SetPosition(0, offsetOrigin);
                     gazeLineRenderer.SetPosition(1, gazeEndPoint);
                     gazeLineRenderer.enabled = true;
                 }
